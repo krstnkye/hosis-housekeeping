@@ -5,16 +5,16 @@ import { TABS } from '../tabs.js'
 // Hotel-wide navigation from the Figma design. Only Housekeeping is
 // built in this module; the other departments' modules plug in later.
 const NAV = [
-  { name: 'Dashboard', icon: 'M3 12 12 4l9 8v8h-6v-5H9v5H3z' },
-  { name: 'Reservation', icon: 'M4 5h16v15H4zM4 10h16M9 3v4M15 3v4' },
-  { name: 'Front office', icon: 'M5 21V5h9l5 5v11zM14 5v5h5' },
-  { name: 'Guest services', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
-  { name: 'Rooms', icon: 'M3 18V8h18v10M3 14h18M7 11h4' },
-  { name: 'Housekeeping', icon: 'M7 21V10l5-6 5 6v11M10 21v-6h4v6' },
-  { name: 'F&B Services', icon: 'M7 3v8a3 3 0 0 0 6 0V3M10 3v18M17 3c-2 2-2 6 0 8v10' },
-  { name: 'Finance', icon: 'M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H6' },
-  { name: 'Reports', icon: 'M5 21V3h10l4 4v14zM9 13h6M9 17h6' },
-  { name: 'Settings', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2' },
+  { id: 'dashboard', name: 'Dashboard', href: '#/dashboard', icon: 'M3 12 12 4l9 8v8h-6v-5H9v5H3z' },
+  { id: 'reservation', name: 'Reservation', href: '#/reservation', icon: 'M4 5h16v15H4zM4 10h16M9 3v4M15 3v4' },
+  { id: 'front-office', name: 'Front office', href: '#/front-office', icon: 'M5 21V5h9l5 5v11zM14 5v5h5' },
+  { id: 'guest-services', name: 'Guest services', href: '#/guest-services', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
+  { id: 'rooms', name: 'Rooms', href: '#/rooms', icon: 'M3 18V8h18v10M3 14h18M7 11h4' },
+  { id: 'housekeeping', name: 'Housekeeping', href: '#/housekeeping/overview', icon: 'M7 21V10l5-6 5 6v11M10 21v-6h4v6' },
+  { id: 'food-beverage', name: 'F&B Services', href: '#/food-beverage', icon: 'M7 3v8a3 3 0 0 0 6 0V3M10 3v18M17 3c-2 2-2 6 0 8v10' },
+  { id: 'finance', name: 'Finance', href: '#/finance', icon: 'M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H6' },
+  { id: 'reports', name: 'Reports', href: '#/reports', icon: 'M5 21V3h10l4 4v14zM9 13h6M9 17h6' },
+  { id: 'settings', name: 'Settings', href: '#/settings', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2' },
 ]
 
 function NavIcon({ d }) {
@@ -25,7 +25,7 @@ function NavIcon({ d }) {
   )
 }
 
-export function Sidebar() {
+export function Sidebar({ activeSection = 'housekeeping' }) {
   return (
     <aside className="hk-sidebar">
       <div className="hk-brand">
@@ -35,15 +35,14 @@ export function Sidebar() {
       </div>
       <nav className="hk-nav" aria-label="Departments">
         {NAV.map((item) => {
-          const active = item.name === 'Housekeeping'
+          const active = item.id === activeSection
           return (
             <a
               key={item.name}
-              href={active ? '#/housekeeping/overview' : undefined}
+              href={item.href}
               className={`hk-nav__item${active ? ' is-active' : ''}`}
               aria-current={active ? 'page' : undefined}
-              aria-disabled={active ? undefined : 'true'}
-              title={active ? undefined : 'Handled by another HOSIS department module'}
+              title={`Open ${item.name}`}
             >
               <NavIcon d={item.icon} />
               {item.name}

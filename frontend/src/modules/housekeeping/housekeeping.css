@@ -82,9 +82,9 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-.hk-nav__item[aria-disabled='true'] {
-  opacity: 0.85;
-  cursor: default;
+.hk-nav__item:hover {
+  filter: brightness(1.08);
+  transform: translateX(2px);
 }
 
 .hk-nav__item.is-active {
@@ -341,6 +341,56 @@
 
 .hk-card p {
   margin: 0;
+}
+
+/* ---------- Hotel-wide module handoff pages ---------- */
+
+.hk-system-page {
+  display: grid;
+  place-items: start center;
+  padding-top: 18px;
+}
+
+.hk-system-card {
+  width: min(760px, 100%);
+  padding: 28px;
+}
+
+.hk-system-card__status {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e5f5e8;
+  color: #247334;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.hk-system-card__details {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--hk-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hk-system-card__details > div {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px;
+}
+
+.hk-system-card__details code {
+  width: fit-content;
+}
+
+.hk-system-card__note {
+  padding: 12px;
+  border-left: 4px solid var(--hk-gold);
+  background: var(--hk-select);
+  color: var(--hk-muted);
+  font-size: 0.86rem;
 }
 
 /* ---------- Tables ---------- */
