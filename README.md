@@ -6,6 +6,7 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 
 - **Figma UI:** [HOSIS UI HOUSEKEEPING UI](https://www.figma.com/design/U9agEBllMDawm1r6kw5zjh/HOSIS-UI-HOUSEKEEPING-UI?node-id=0-1&t=0KxXxH3KA1KuYSKY-1)
 - **Project documentation:** `docs/housekeeping/documentation/Housekeeping_Documentation_BSIT_3_Alpha.docx`
+- **Class-project integration:** `docs/housekeeping/INTEGRATION.md`
 
 | Layer    | Location                                         |
 | -------- | ------------------------------------------------ |

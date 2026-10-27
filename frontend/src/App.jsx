@@ -1,4 +1,4 @@
-import HousekeepingApp from './modules/housekeeping/HousekeepingApp.jsx'
+import { HousekeepingApp } from './modules/housekeeping/index.js'
 
 // Each HOSIS subsystem lives in src/modules/<subsystem>.
 // Only the Housekeeping module is built so far.

@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./modules/auth/auth.routes');
-const housekeepingRoutes = require('./modules/housekeeping/housekeeping.routes');
+const housekeepingRoutes = require('./modules/housekeeping');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
