@@ -1,0 +1,358 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" modified="2026-10-20T12:26:09+00:00" agent="Codex" version="24.7.17" type="device">
+  <diagram id="housekeeping-flowchart" name="Housekeeping Flowchart">
+    <mxGraphModel dx="2400" dy="2200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="HOSIS Housekeeping Department Flowchart" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#243247;" vertex="1" parent="1">
+          <mxGeometry x="730" y="10" width="940" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="start" value="START" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#E9E0F4;strokeColor=#7B61A8;fontColor=#243247;fontSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="80" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="login" value="Housekeeping Staff Log In" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9E0F4;strokeColor=#7B61A8;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="180" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="authorized" value="Authorized?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF0C2;strokeColor=#C58B16;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="300" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="accessDenied" value="Access Denied" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="320" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="accessEnd" value="END" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1900" y="325" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dashboard" value="Housekeeping Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9E0F4;strokeColor=#7B61A8;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="470" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="selectFunction" value="Select Function" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#E9E0F4;strokeColor=#7B61A8;fontColor=#243247;fontSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="590" width="400" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="start" target="login">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="login" target="authorized">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="authorized" target="dashboard">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="authorized" target="accessDenied">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="accessDenied" target="accessEnd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="dashboard" target="selectFunction">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="roomHeader" value="Manage Room Status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="roomHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cleanHeader" value="Manage Cleaning Tasks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="cleanHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scheduleHeader" value="Manage Schedules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="840" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="scheduleHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lostHeader" value="Manage Lost and Found" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="lostHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="guestHeader" value="Manage Guest Requests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="guestHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="maintenanceHeader" value="Report Maintenance Issue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;fontStyle=1;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="760" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectFunction" target="maintenanceHeader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="viewRooms" value="View Room Status HK-001" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="selectRoom" value="Select Room HK-002" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="updateRoom" value="Update Room Status HK-003" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="statusUpdated" value="Status Updated" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1170" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="notifyFrontOffice" value="Notify Front Office" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1270" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="roomHeader" target="viewRooms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="viewRooms" target="selectRoom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="selectRoom" target="updateRoom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="updateRoom" target="statusUpdated">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="statusUpdated" target="notifyFrontOffice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="createTask" value="Create or Update Task HK-004" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="assignHousekeeper" value="Assign Housekeeper HK-005" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="performCleaning" value="Perform Cleaning HK-006" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cleaningComplete" value="Cleaning Completed?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF0C2;strokeColor=#C58B16;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="1170" width="280" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="inspectRoom" value="Inspect Room HK-007" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1320" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="inspectionPassed" value="Inspection Passed?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF0C2;strokeColor=#C58B16;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="1420" width="280" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="markInspected" value="Mark CLEAN or INSPECTED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="440" y="1570" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="returnCleaning" value="Return for Re-cleaning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="790" y="1440" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge18" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="cleanHeader" target="createTask">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="createTask" target="assignHousekeeper">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="assignHousekeeper" target="performCleaning">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="performCleaning" target="cleaningComplete">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge22" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="cleaningComplete" target="inspectRoom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge23" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="cleaningComplete" target="performCleaning">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="1225" />
+              <mxPoint x="800" y="1105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge24" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="inspectRoom" target="inspectionPassed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge25" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="inspectionPassed" target="markInspected">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge26" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="inspectionPassed" target="returnCleaning">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge27" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="returnCleaning" target="performCleaning">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="930" y="1660" />
+              <mxPoint x="820" y="1660" />
+              <mxPoint x="820" y="1105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="viewSchedule" value="View Staff Schedule HK-008" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="840" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="updateSchedule" value="Create or Update Schedule HK-009" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="840" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="assignShift" value="Assign Workload or Shift" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge28" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="scheduleHeader" target="viewSchedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge29" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="viewSchedule" target="updateSchedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge30" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="updateSchedule" target="assignShift">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="recordItem" value="Record Found Item HK-010" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="storeItem" value="Store and Label Item" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="searchItems" value="Search or View Records HK-011" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="validClaim" value="Valid Claim?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF0C2;strokeColor=#C58B16;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="1170" width="280" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="releaseItem" value="Release Item and Update HK-012" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="1320" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="lostHeader" target="recordItem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge32" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="recordItem" target="storeItem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge33" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="storeItem" target="searchItems">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge34" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="searchItems" target="validClaim">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge35" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="validClaim" target="releaseItem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge36" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="validClaim" target="searchItems">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1590" y="1225" />
+              <mxPoint x="1590" y="1105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="recordRequest" value="Record Request HK-013" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="processRequest" value="Assign and Process Request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEAF7;strokeColor=#4E82B3;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="completeRequest" value="Complete Request HK-014" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge37" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="guestHeader" target="recordRequest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge38" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="recordRequest" target="processRequest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge39" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="processRequest" target="completeRequest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="createMaintenance" value="Create Maintenance Request HK-015" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="870" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="outOfOrder" value="Set Room OUT OF ORDER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="970" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="repair" value="Engineering Completes Repair" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8D8D5;strokeColor=#B95A52;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="1070" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="repairComplete" value="Update Status and Create Cleaning Task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DDF0E0;strokeColor=#4F9561;fontColor=#243247;fontSize=14;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="1170" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge40" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="maintenanceHeader" target="createMaintenance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="createMaintenance" target="outOfOrder">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge42" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="outOfOrder" target="repair">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge43" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="repair" target="repairComplete">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="merge" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#627186;strokeColor=#627186;" vertex="1" parent="1">
+          <mxGeometry x="1194" y="1720" width="12" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="edge44" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="notifyFrontOffice" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="200" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge45" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="markInspected" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge46" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="assignShift" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge47" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="releaseItem" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1400" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge48" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="completeRequest" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1800" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge49" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="repairComplete" target="merge">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2200" y="1710" />
+              <mxPoint x="1200" y="1710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="endSession" value="End Session?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF0C2;strokeColor=#C58B16;fontColor=#243247;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="1810" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="mainEnd" value="END" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#E9E0F4;strokeColor=#7B61A8;fontColor=#243247;fontSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="1990" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge50" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="merge" target="endSession">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge51" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="endSession" target="mainEnd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge52" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#627186;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#243247;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="endSession" target="selectFunction">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="1870" />
+              <mxPoint x="10" y="1870" />
+              <mxPoint x="10" y="635" />
+              <mxPoint x="1000" y="635" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note" value="Corrected notation: Select Function is an input step. End Session? uses Yes to end and No to return." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#526174;" vertex="1" parent="1">
+          <mxGeometry x="630" y="2090" width="1140" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

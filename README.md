@@ -4,6 +4,9 @@ The Housekeeping module of HOSIS, built from the Housekeeping Department
 Flowchart (`docs/Flowchart/housekeeping-department-flowchart.drawio`), the
 Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 
+- **Figma UI:** [HOSIS UI HOUSEKEEPING UI](https://www.figma.com/design/U9agEBllMDawm1r6kw5zjh/HOSIS-UI-HOUSEKEEPING-UI?node-id=0-1&t=0KxXxH3KA1KuYSKY-1)
+- **Project documentation:** `docs/housekeeping/documentation/Housekeeping_Documentation_BSIT_3_Alpha.docx`
+
 | Layer    | Location                                         |
 | -------- | ------------------------------------------------ |
 | Database | `database/schema/06-housekeeping.sql`, `database/seed/06-housekeeping-seed.sql` |
@@ -132,5 +135,7 @@ item release, and maintenance release).
 ## About this repository
 
 This repository holds only the Housekeeping subsystem of HOSIS, so the group
-can clone and run it on any laptop. The full hotel system lives in
-https://github.com/mayonathaniel44-alt/HOSIS (branch `housekeeping`).
+can clone and run it on any laptop. The class-wide hotel system repository is
+https://github.com/mayonathaniel44-alt/HOSIS. As of October 27, 2026, its
+latest Housekeeping contribution is the editable department flowchart on
+`main`; this standalone repository contains the group's current implementation.
