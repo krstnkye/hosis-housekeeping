@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import Logo from './Logo.jsx'
 import { SearchIcon } from './ui.jsx'
 import { TABS } from '../tabs.js'
@@ -83,17 +84,31 @@ export function Topbar({ user, search, onSearch, onLogout }) {
 }
 
 export function PageHeader({ title, subtitle }) {
-  const now = new Date()
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    let intervalId
+    const timeoutId = window.setTimeout(() => {
+      setNow(new Date())
+      intervalId = window.setInterval(() => setNow(new Date()), 1000)
+    }, 1000 - (Date.now() % 1000))
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      if (intervalId) window.clearInterval(intervalId)
+    }
+  }, [])
+
   return (
     <div className="hk-page-head">
       <div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
       </div>
-      <div className="hk-page-head__date">
+      <time className="hk-page-head__date" dateTime={now.toISOString()} aria-label="Current date and time">
         <span>{now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        <span>{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-      </div>
+        <span>{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>
+      </time>
     </div>
   )
 }
