@@ -12,6 +12,13 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 | Frontend | `frontend/src/modules/housekeeping/` |
 | Tests    | `backend/test/housekeeping.test.js` |
 
+## Documentation
+
+The current Housekeeping-only project document is
+[`documentation/Housekeeping_Subsystem_Documentation_Updated_2026.docx`](documentation/Housekeeping_Subsystem_Documentation_Updated_2026.docx).
+It keeps the professor's required format and covers the implemented ERD, DFD,
+flowchart, UI screens, database dictionary, tests, and user manual.
+
 ## Running it locally
 
 1. Create a PostgreSQL database and load the schema and sample data:
