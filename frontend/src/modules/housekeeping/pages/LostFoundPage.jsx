@@ -11,19 +11,23 @@ export default function LostFoundPage({ search: topSearch }) {
   const [selectedId, setSelectedId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
+  const [itemOverrides, setItemOverrides] = useState({})
   const items = useLoad(() => api.lostFound(status ? `?status=${status}` : ''), [status])
   const rooms = useLoad(() => api.rooms(), [])
 
   const query = (search || topSearch).toLowerCase()
-  const list = (items.data?.items || []).filter(
-    (i) => !query || `${i.storage_label} ${i.item_description} ${i.room_number || ''}`.toLowerCase().includes(query)
-  )
+  const list = (items.data?.items || [])
+    .map((i) => itemOverrides[i.item_id] ? { ...i, ...itemOverrides[i.item_id] } : i)
+    .filter((i) => !query || `${i.storage_label} ${i.item_description} ${i.room_number || ''}`.toLowerCase().includes(query))
   const selected = creating ? null : list.find((i) => i.item_id === selectedId) || list[0]
 
-  function refresh(msg, itemId) {
+  function refresh(msg, itemId, updatedItem) {
     setFlash(msg)
     setCreating(false)
     if (itemId) setSelectedId(itemId)
+    if (updatedItem) {
+      setItemOverrides((current) => ({ ...current, [updatedItem.item_id]: updatedItem }))
+    }
     items.reload()
   }
 
@@ -102,7 +106,7 @@ function NewItemForm({ rooms, onSaved }) {
     setError(null)
     try {
       const { item } = await api.createItem({ ...form, roomId: form.roomId || null })
-      onSaved({ tone: 'green', title: `Item recorded as ${item.storage_label}`, text: `Label the item ${item.storage_label} and store it at ${item.storage_location}.` }, item.item_id)
+      onSaved({ tone: 'green', title: `Item recorded as ${item.storage_label}`, text: `Label the item ${item.storage_label} and store it at ${item.storage_location}.` }, item.item_id, item)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -147,12 +151,14 @@ function ItemDetail({ item, onSaved }) {
   const stored = item.item_status === 'STORED'
   const verified = claim.idVerified && claim.descriptionMatch
   const hasClaimant = claim.claimantName && claim.claimantContact
+  const releaseReady = Boolean(hasClaimant && verified)
 
   async function run(action) {
     setBusy(true)
     setError(null)
     try {
-      onSaved(await action(), item.item_id)
+      const result = await action()
+      onSaved(result.message, item.item_id, result.item)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -162,16 +168,19 @@ function ItemDetail({ item, onSaved }) {
 
   const update = () =>
     run(async () => {
-      await api.updateItem(item.item_id, form)
-      return { tone: 'green', title: 'Record updated.' }
+      const res = await api.updateItem(item.item_id, form)
+      return { message: { tone: 'green', title: 'Item details updated.' }, item: res.item }
     })
 
   const processClaim = () =>
     run(async () => {
       const res = await api.claimItem(item.item_id, claim)
-      return res.released
-        ? { tone: 'green', title: `${item.storage_label} released to ${claim.claimantName}` }
-        : { tone: 'amber', title: 'Claim rejected', text: 'The claim was recorded as rejected. The item stays in storage.' }
+      return {
+        message: res.released
+          ? { tone: 'green', title: `${item.storage_label} released to ${claim.claimantName}`, text: 'The found-item record is now marked Released.' }
+          : { tone: 'amber', title: 'Claim rejected', text: 'The claim was recorded as rejected. The item stays in storage.' },
+        item: res.item,
+      }
     })
 
   return (
@@ -218,7 +227,7 @@ function ItemDetail({ item, onSaved }) {
             <Notice tone="green" title="Valid claim">The item can be released to the claimant.</Notice>
           ) : (
             <Notice tone="amber" title="Release blocked - verification incomplete">
-              Check a valid ID and confirm the description before releasing. Processing now records the claim as rejected.
+              Enter the claimant details, check a valid ID, and confirm that the description matches before releasing the item.
             </Notice>
           )}
         </>
@@ -226,9 +235,12 @@ function ItemDetail({ item, onSaved }) {
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
       {stored && (
         <div className="hk-actions">
-          <button type="button" className="hk-btn hk-btn--primary" disabled={busy} onClick={update}>Update record</button>
-          <button type="button" className="hk-btn hk-btn--secondary" disabled={busy || !hasClaimant} onClick={processClaim}>
-            {verified ? 'Release item' : 'Reject claim'}
+          <button type="button" className="hk-btn hk-btn--secondary" disabled={busy} onClick={update}>Save item details</button>
+          <button type="button" className="hk-btn hk-btn--secondary" disabled={busy || !hasClaimant || verified} onClick={processClaim}>
+            Record rejected claim
+          </button>
+          <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !releaseReady} onClick={processClaim}>
+            Release item
           </button>
         </div>
       )}

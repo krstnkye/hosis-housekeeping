@@ -177,6 +177,12 @@ test('lost and found: invalid claim is rejected, valid claim releases', async ()
   assert.equal(valid.body.released, true);
   assert.equal(valid.body.item.item_status, 'RELEASED');
 
+  // The records list must immediately return the item under RELEASED, not STORED.
+  const releasedItems = await api('GET', '/housekeeping/lost-found?status=RELEASED', { token: liza.token });
+  assert.ok(releasedItems.body.items.some((item) => item.item_id === itemId));
+  const storedItems = await api('GET', '/housekeeping/lost-found?status=STORED', { token: liza.token });
+  assert.equal(storedItems.body.items.some((item) => item.item_id === itemId), false);
+
   const again = await api('POST', `/housekeeping/lost-found/${itemId}/claims`, {
     token: liza.token,
     body: { claimantName: 'X', claimantContact: 'Y', idVerified: true, descriptionMatch: true },
