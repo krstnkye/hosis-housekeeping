@@ -8,22 +8,23 @@ const { authenticate } = require('../../middleware/auth');
 const router = express.Router();
 
 // POST /api/auth/login  { username, password, department? }
+// username may also be the staff member's email address.
 // When a department is given (e.g. HOUSEKEEPING), the account must belong
 // to it, so other departments' staff are denied at the Housekeeping login.
 router.post('/login', async (req, res) => {
   const { username, password, department } = req.body || {};
   if (!username || !password) {
-    throw new HttpError(400, 'Username and password are required.');
+    throw new HttpError(400, 'Email and password are required.');
   }
 
   const { rows } = await db.query(
     `SELECT user_id, first_name, last_name, username, password_hash, role, position, employment_status
-       FROM users WHERE username = $1`,
+       FROM users WHERE username = $1 OR LOWER(email) = LOWER($1)`,
     [username]
   );
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-    throw new HttpError(401, 'Incorrect username or password.');
+    throw new HttpError(401, 'Incorrect email or password.');
   }
   if (user.employment_status !== 'ACTIVE') {
     throw new HttpError(403, 'Access denied - this account is not active.');

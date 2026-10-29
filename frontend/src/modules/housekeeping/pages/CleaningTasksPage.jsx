@@ -5,12 +5,19 @@ import { formatDateTime, formatTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
 
 const TASK_TYPES = ['CHECKOUT', 'STAYOVER', 'DEEP_CLEAN', 'TOUCH_UP', 'POST_REPAIR']
+// Filter groups from the Figma design: To Do / In Progress / Complete.
+const GROUPS = {
+  todo: ['PENDING', 'ASSIGNED', 'RETURNED'],
+  progress: ['IN_PROGRESS'],
+  complete: ['COMPLETED', 'INSPECTED'],
+}
 const PROGRESS = { PENDING: 0, ASSIGNED: 15, RETURNED: 15, IN_PROGRESS: 55, COMPLETED: 85, INSPECTED: 100 }
 
 // HK-004 Create/Update Task, HK-005 Assign Housekeeper, HK-006 Perform Cleaning.
 export default function CleaningTasksPage({ user, search: topSearch }) {
   const [search, setSearch] = useState('')
   const [mine, setMine] = useState(user.position === 'HOUSEKEEPER')
+  const [group, setGroup] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
@@ -20,8 +27,16 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
   const isSupervisor = user.position === 'SUPERVISOR' || user.role === 'ADMIN'
 
   const query = (search || topSearch).toLowerCase()
-  const list = (tasks.data?.tasks || []).filter(
-    (t) => !query || `${t.room_number} ${t.housekeeper || ''} ${t.task_type}`.toLowerCase().includes(query)
+  const all = tasks.data?.tasks || []
+  const count = (g) => all.filter((t) => GROUPS[g].includes(t.task_status)).length
+  const done = count('complete')
+  const summary = all.length
+    ? `${done} / ${all.length} complete · ${Math.round((done / all.length) * 100)}% · ${count('progress')} in progress · ${count('todo')} to do`
+    : 'No cleaning tasks today'
+  const list = all.filter(
+    (t) =>
+      (!group || GROUPS[group].includes(t.task_status)) &&
+      (!query || `${t.room_number} ${t.housekeeper || ''} ${t.task_type}`.toLowerCase().includes(query))
   )
   const selected = creating ? null : list.find((t) => t.task_id === selectedId) || list[0]
 
@@ -37,12 +52,18 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
     <div className="hk-grid">
       <div className="hk-stack">
         {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-        <Card title="Today's cleaning queue" subtitle={`${list.length} task(s) · ordered by priority and due time`}>
+        <Card title="Today's cleaning queue" subtitle={summary}>
           <div className="hk-toolbar">
             <SearchBox value={search} onChange={setSearch} placeholder="Search room or housekeeper" />
             <select value={mine ? 'mine' : 'all'} onChange={(e) => setMine(e.target.value === 'mine')} aria-label="Show tasks">
               <option value="all">All tasks</option>
               <option value="mine">My tasks</option>
+            </select>
+            <select value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Filter by progress">
+              <option value="">Filter: all</option>
+              <option value="todo">To do</option>
+              <option value="progress">In progress</option>
+              <option value="complete">Complete</option>
             </select>
           </div>
           <LoadState loading={tasks.loading && !tasks.data} error={tasks.error} />
@@ -63,12 +84,12 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
           />
           <p className="hk-footnote">Completed tasks move to Inspection. Returned tasks need re-cleaning.</p>
         </Card>
-        <Card title="Housekeeper workload" subtitle="Open and finished tasks today">
+        <Card title="Housekeeper workload" subtitle="Completed / assigned today">
           <div className="hk-workload">
             {(workload.data?.workload || []).map((w) => (
               <div key={w.user_id}>
-                <strong>{w.name}</strong>
-                <span>{w.open_tasks} open · {w.done_tasks} done</span>
+                <span>{w.name}</span>
+                <strong className="hk-workload__count">{w.done_tasks} / {w.open_tasks + w.done_tasks}</strong>
               </div>
             ))}
           </div>

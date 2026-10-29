@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api.js'
+import ExportMenu from '../components/ExportMenu.jsx'
 import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
@@ -12,63 +13,106 @@ const CHECKLIST = [
   { id: 'fixtures', title: 'Fixtures and equipment', text: 'Lights, aircon, TV and phone working' },
 ]
 
+const PROGRESS = [
+  { value: 'COMPLETED', text: 'Awaiting inspection', short: 'Awaiting' },
+  { value: 'RETURNED', text: 'Returned for re-cleaning', short: 'Returned' },
+  { value: 'INSPECTED', text: 'Passed', short: 'Passed' },
+  { value: '', text: 'All progress' },
+]
+
+const REPORT_COLUMNS = [
+  { title: 'Room', value: (t) => `${t.room_number} ${t.room_type}` },
+  { title: 'Cleaning type', value: (t) => label(t.task_type) },
+  { title: 'Cleaned by', value: (t) => t.housekeeper?.trim() || '-' },
+  { title: 'Priority', value: (t) => label(t.priority) },
+  { title: 'Progress', value: (t) => progressText(t.task_status) },
+  { title: 'Finished', value: (t) => formatDateTime(t.completion_time) },
+]
+
+function progressText(status, short = false) {
+  const p = PROGRESS.find((x) => x.value === status)
+  return (short ? p?.short : p?.text) || label(status)
+}
+
 // HK-007 Inspect Room -> Inspection Passed? -> Mark INSPECTED / Return for Re-cleaning.
 export default function InspectionPage({ user }) {
-  const queue = useLoad(() => api.inspectionQueue(), [])
-  const recent = useLoad(() => api.inspections(), [])
+  const [progress, setProgress] = useState('COMPLETED')
+  const list = useLoad(
+    () =>
+      Promise.all(['COMPLETED', 'RETURNED', 'INSPECTED'].map((s) => api.tasks(`?status=${s}`))).then((r) =>
+        r.flatMap((x) => x.tasks)
+      ),
+    []
+  )
+  const activity = useLoad(() => api.activity(), [])
   const [selectedId, setSelectedId] = useState(null)
   const [flash, setFlash] = useState(null)
   const canInspect = ['INSPECTOR', 'SUPERVISOR'].includes(user.position) || user.role === 'ADMIN'
 
-  const list = queue.data?.queue || []
-  const selected = list.find((t) => t.task_id === selectedId) || list[0]
+  const rows = (list.data || []).filter((t) => !progress || t.task_status === progress)
+  const selected = rows.find((t) => t.task_id === selectedId) || rows[0]
+  const waiting = (list.data || []).filter((t) => t.task_status === 'COMPLETED').length
 
   return (
     <div className="hk-grid hk-grid--narrow-left">
       <div className="hk-stack">
         {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-        <Card title={`Awaiting inspection · ${list.length}`} subtitle="Rooms cleaned but not yet approved">
-          <LoadState loading={queue.loading && !queue.data} error={queue.error} />
+        <Card title="Inspection list" subtitle={`${waiting} room(s) waiting for inspection`}>
+          <div className="hk-toolbar">
+            <select value={progress} onChange={(e) => setProgress(e.target.value)} aria-label="Filter by progress">
+              {PROGRESS.map((p) => <option key={p.value} value={p.value}>{p.text}</option>)}
+            </select>
+          </div>
+          <LoadState loading={list.loading && !list.data} error={list.error} />
           <DataTable
             rowKey="task_id"
-            rows={list}
+            rows={rows}
             selectedKey={selected?.task_id}
             onSelect={(t) => setSelectedId(t.task_id)}
-            empty="No rooms waiting for inspection."
+            empty="No rooms with this progress."
             columns={[
               { key: 'room', title: 'Room', render: (t) => <strong>{t.room_number}</strong> },
               { key: 'hk', title: 'Cleaned by', render: (t) => t.housekeeper?.trim() || '-' },
-              { key: 'done', title: 'Done', render: (t) => formatTime(t.completion_time) },
+              { key: 'priority', title: 'Priority', render: (t) => <Badge value={t.priority} /> },
+              { key: 'progress', title: 'Progress', render: (t) => <Badge value={t.task_status}>{progressText(t.task_status, true)}</Badge> },
             ]}
           />
-          <p className="hk-footnote">Rooms are sold only after they pass inspection.</p>
+          <div className="hk-report-bar">
+            <span className="hk-footnote">Generate a report of the rooms shown above.</span>
+            <ExportMenu title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
+          </div>
         </Card>
         {selected && (
           <Card title="Cleaning evidence">
-            <p>{label(selected.task_type)} cleaning by {selected.housekeeper?.trim() || '-'}</p>
-            <p className="hk-muted">
-              Started {formatTime(selected.start_time)} · Finished {formatTime(selected.completion_time)}
-            </p>
-            {selected.previous_inspections > 0 && (
-              <div className="hk-badges"><Badge value="RETURNED">Re-cleaned after {selected.previous_inspections} failed inspection(s)</Badge></div>
-            )}
-            {selected.notes && <p className="hk-muted">Note: {selected.notes}</p>}
+            <ul className="hk-list">
+              <li>
+                <span>Task #{selected.task_id} · {label(selected.task_type)}</span>
+              </li>
+              <li>
+                <span>
+                  {selected.housekeeper?.trim() || '-'} · {formatTime(selected.start_time)} - {formatTime(selected.completion_time)}
+                </span>
+              </li>
+            </ul>
+            {selected.notes && <p className="hk-muted">{selected.notes}</p>}
           </Card>
         )}
-        <Card title="Recent results">
-          {recent.data?.inspections.length === 0 && <p className="hk-muted">No inspections recorded yet.</p>}
+        <Card title="Recent activity" subtitle="Latest room status changes">
+          {activity.data?.activity.length === 0 && <p className="hk-muted">No activity yet.</p>}
           <ul className="hk-list">
-            {(recent.data?.inspections || []).slice(0, 5).map((i) => (
-              <li key={i.inspection_id}>
-                <span>Room {i.room_number} <Badge value={i.inspection_result} /></span>
-                <small>{i.inspector} · {formatDateTime(i.inspected_at)}</small>
+            {(activity.data?.activity || []).slice(0, 8).map((a) => (
+              <li key={a.log_id}>
+                <span>
+                  Room {a.room_number}: {label(a.previous_status)} → <strong>{label(a.new_status)}</strong>
+                </span>
+                <small>{a.changed_by?.trim() || 'System'} · {formatDateTime(a.changed_at)}</small>
               </li>
             ))}
           </ul>
         </Card>
       </div>
 
-      {selected ? (
+      {selected?.task_status === 'COMPLETED' ? (
         <InspectionForm
           key={selected.task_id}
           task={selected}
@@ -77,14 +121,38 @@ export default function InspectionPage({ user }) {
           onDone={(msg) => {
             setFlash(msg)
             setSelectedId(null)
-            queue.reload()
-            recent.reload()
+            list.reload()
+            activity.reload()
           }}
         />
+      ) : selected ? (
+        <InspectionHistory key={selected.task_id} task={selected} />
       ) : (
         <Card title="Inspect room"><p className="hk-muted">Select a room from the list.</p></Card>
       )}
     </div>
+  )
+}
+
+function InspectionHistory({ task }) {
+  const history = useLoad(() => api.inspections(`?taskId=${task.task_id}`), [task.task_id])
+  return (
+    <Card title={`Room ${task.room_number} · ${task.room_type}`} subtitle={`${label(task.task_type)} cleaning by ${task.housekeeper?.trim() || '-'}`}>
+      <div className="hk-badges"><Badge value={task.task_status}>{progressText(task.task_status)}</Badge><Badge value={task.priority}>{label(task.priority)} priority</Badge></div>
+      {task.task_status === 'RETURNED' && (
+        <Notice tone="amber" title="Waiting for re-cleaning">The housekeeper has to clean the room again before it can be inspected.</Notice>
+      )}
+      <h3 className="hk-subhead">Inspection results</h3>
+      <LoadState loading={history.loading && !history.data} error={history.error} />
+      <ul className="hk-list">
+        {(history.data?.inspections || []).map((i) => (
+          <li key={i.inspection_id}>
+            <span><Badge value={i.inspection_result} /> {i.remarks || 'No notes'}</span>
+            <small>{i.inspector} · {formatDateTime(i.inspected_at)}</small>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 

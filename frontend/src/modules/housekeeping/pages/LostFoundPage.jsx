@@ -1,14 +1,26 @@
 import { useState } from 'react'
 import { api } from '../api.js'
+import ExportMenu from '../components/ExportMenu.jsx'
+import Modal from '../components/Modal.jsx'
 import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
 import { formatDateTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
+
+const REPORT_COLUMNS = [
+  { title: 'Label', value: (i) => i.storage_label },
+  { title: 'Item', value: (i) => i.item_description },
+  { title: 'Found in', value: (i) => (i.room_number ? `Room ${i.room_number}, ${i.found_location}` : i.found_location) },
+  { title: 'Found', value: (i) => formatDateTime(i.found_at) },
+  { title: 'Found by', value: (i) => i.found_by_name },
+  { title: 'Storage', value: (i) => i.storage_location },
+  { title: 'Status', value: (i) => label(i.item_status) },
+]
 
 // HK-010 Record Found Item -> Store/Label -> HK-011 Search/View -> Valid Claim? -> HK-012 Release.
 export default function LostFoundPage({ search: topSearch }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+  const [openId, setOpenId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
   const [itemOverrides, setItemOverrides] = useState({})
@@ -17,14 +29,14 @@ export default function LostFoundPage({ search: topSearch }) {
 
   const query = (search || topSearch).toLowerCase()
   const list = (items.data?.items || [])
-    .map((i) => itemOverrides[i.item_id] ? { ...i, ...itemOverrides[i.item_id] } : i)
+    .map((i) => (itemOverrides[i.item_id] ? { ...i, ...itemOverrides[i.item_id] } : i))
     .filter((i) => !query || `${i.storage_label} ${i.item_description} ${i.room_number || ''}`.toLowerCase().includes(query))
-  const selected = creating ? null : list.find((i) => i.item_id === selectedId) || list[0]
+  const opened = list.find((i) => i.item_id === openId)
 
   function refresh(msg, itemId, updatedItem) {
     setFlash(msg)
     setCreating(false)
-    if (itemId) setSelectedId(itemId)
+    setOpenId(null)
     if (updatedItem) {
       setItemOverrides((current) => ({ ...current, [updatedItem.item_id]: updatedItem }))
     }
@@ -32,46 +44,53 @@ export default function LostFoundPage({ search: topSearch }) {
   }
 
   return (
-    <div className="hk-grid">
-      <div className="hk-stack">
-        {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-        <Card title="Found item records">
-          <div className="hk-toolbar">
-            <SearchBox value={search} onChange={setSearch} placeholder="Search label, item or room" />
-            <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status">
-              <option value="">All status</option>
-              <option value="STORED">Stored</option>
-              <option value="RELEASED">Released</option>
-              <option value="DISPOSED">Disposed</option>
-            </select>
-          </div>
-          <LoadState loading={items.loading && !items.data} error={items.error} />
-          <DataTable
-            rowKey="item_id"
-            rows={list}
-            selectedKey={selected?.item_id}
-            onSelect={(i) => {
-              setCreating(false)
-              setSelectedId(i.item_id)
-            }}
-            empty="No found items recorded."
-            columns={[
-              { key: 'item', title: 'Item / Reference', render: (i) => <span><strong>{i.item_description}</strong><small className="hk-block">{i.storage_label}</small></span> },
-              { key: 'found', title: 'Found', render: (i) => <span>{i.room_number ? `Room ${i.room_number}` : i.found_location}<small className="hk-block">{formatDateTime(i.found_at)}</small></span> },
-              { key: 'status', title: 'Status', render: (i) => <Badge value={i.item_status} /> },
-            ]}
-          />
+    <div className="hk-stack">
+      {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
+      <Card
+        title="Found item records"
+        subtitle="Click a record to open its details"
+        actions={
           <div className="hk-actions">
-            <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setCreating(true)}>+ Record found item</button>
+            <button type="button" className="hk-btn hk-btn--primary" onClick={() => setCreating(true)}>+ Record found item</button>
+            <ExportMenu title="Lost & Found Records" fileName="lost-and-found" columns={REPORT_COLUMNS} rows={list} />
           </div>
-        </Card>
-        {selected && <ClaimHistory key={selected.item_id} item={selected} />}
-      </div>
+        }
+      >
+        <div className="hk-toolbar">
+          <SearchBox value={search} onChange={setSearch} placeholder="Search label, item or room" />
+          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+            <option value="">Status</option>
+            <option value="STORED">Stored</option>
+            <option value="RELEASED">Released</option>
+            <option value="DISPOSED">Disposed</option>
+          </select>
+        </div>
+        <LoadState loading={items.loading && !items.data} error={items.error} />
+        <DataTable
+          rowKey="item_id"
+          rows={list}
+          onSelect={(i) => setOpenId(i.item_id)}
+          empty="No found items recorded."
+          columns={[
+            { key: 'ref', title: 'Reference', render: (i) => <strong>{i.storage_label}</strong> },
+            { key: 'item', title: 'Item', render: (i) => i.item_description },
+            { key: 'found', title: 'Found', render: (i) => <span>{i.room_number ? `Room ${i.room_number}` : i.found_location}<small className="hk-block">{formatDateTime(i.found_at)}</small></span> },
+            { key: 'storage', title: 'Storage', render: (i) => i.storage_location },
+            { key: 'status', title: 'Status', render: (i) => <Badge value={i.item_status} /> },
+          ]}
+        />
+      </Card>
 
-      {creating || !selected ? (
-        rooms.data && <NewItemForm rooms={rooms.data.rooms} onSaved={refresh} />
-      ) : (
-        <ItemDetail key={selected.item_id} item={selected} onSaved={refresh} />
+      {opened && (
+        <Modal title={`Found item ${opened.storage_label}`} onClose={() => setOpenId(null)}>
+          <ItemDetail key={opened.item_id} item={opened} onSaved={refresh} />
+          <ClaimHistory item={opened} />
+        </Modal>
+      )}
+      {creating && rooms.data && (
+        <Modal title="Record found item" onClose={() => setCreating(false)}>
+          <NewItemForm rooms={rooms.data.rooms} onSaved={refresh} />
+        </Modal>
       )}
     </div>
   )

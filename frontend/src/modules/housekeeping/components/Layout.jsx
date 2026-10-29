@@ -1,51 +1,48 @@
-import Logo from './Logo.jsx'
-import { SearchIcon } from './ui.jsx'
+import { useEffect, useState } from 'react'
+import Icon from './Icon.jsx'
+import Modal from './Modal.jsx'
+import NotificationBell from './NotificationBell.jsx'
+import { api } from '../api.js'
+import { Notice } from './ui.jsx'
 import { TABS } from '../tabs.js'
+import logoSidebar from '../assets/logo-sidebar.png'
+import logoMark from '../assets/logo-mark.png'
 
-// Hotel-wide navigation from the Figma design. Only Housekeeping is
-// built in this module; the other departments' modules plug in later.
-const NAV = [
-  { id: 'dashboard', name: 'Dashboard', href: '#/dashboard', icon: 'M3 12 12 4l9 8v8h-6v-5H9v5H3z' },
-  { id: 'reservation', name: 'Reservation', href: '#/reservation', icon: 'M4 5h16v15H4zM4 10h16M9 3v4M15 3v4' },
-  { id: 'front-office', name: 'Front office', href: '#/front-office', icon: 'M5 21V5h9l5 5v11zM14 5v5h5' },
-  { id: 'guest-services', name: 'Guest services', href: '#/guest-services', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
-  { id: 'rooms', name: 'Rooms', href: '#/rooms', icon: 'M3 18V8h18v10M3 14h18M7 11h4' },
-  { id: 'housekeeping', name: 'Housekeeping', href: '#/housekeeping/overview', icon: 'M7 21V10l5-6 5 6v11M10 21v-6h4v6' },
-  { id: 'food-beverage', name: 'F&B Services', href: '#/food-beverage', icon: 'M7 3v8a3 3 0 0 0 6 0V3M10 3v18M17 3c-2 2-2 6 0 8v10' },
-  { id: 'finance', name: 'Finance', href: '#/finance', icon: 'M12 3v18M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H6' },
-  { id: 'reports', name: 'Reports', href: '#/reports', icon: 'M5 21V3h10l4 4v14zM9 13h6M9 17h6' },
-  { id: 'settings', name: 'Settings', href: '#/settings', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2' },
-]
-
-function NavIcon({ d }) {
+// Housekeeping menu from the Figma design. It can be minimized to icons only.
+export function Sidebar({ current, collapsed, onToggle }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
-  )
-}
-
-export function Sidebar({ activeSection = 'housekeeping' }) {
-  return (
-    <aside className="hk-sidebar">
+    <aside className={`hk-sidebar${collapsed ? ' is-collapsed' : ''}`}>
+      <button
+        type="button"
+        className="hk-sidebar__toggle"
+        onClick={onToggle}
+        aria-label={collapsed ? 'Expand menu' : 'Minimize menu'}
+        aria-expanded={!collapsed}
+        title={collapsed ? 'Expand menu' : 'Minimize menu'}
+      >
+        <Icon d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
+      </button>
       <div className="hk-brand">
-        <Logo size={72} />
-        <span className="hk-brand__name">Grand Horizon Hotel</span>
-        <span className="hk-brand__tag">Stay · Relax · Belong</span>
+        <img
+          src={collapsed ? logoMark : logoSidebar}
+          alt="Grand Horizon Hotel - Stay, Relax, Belong"
+          className={collapsed ? 'hk-brand__mark' : 'hk-brand__logo'}
+        />
       </div>
-      <nav className="hk-nav" aria-label="Departments">
-        {NAV.map((item) => {
-          const active = item.id === activeSection
+      <nav className="hk-nav" aria-label="Housekeeping functions">
+        {TABS.map((t) => {
+          const active = t.id === current
           return (
             <a
-              key={item.name}
-              href={item.href}
+              key={t.id}
+              href={`#/housekeeping/${t.id}`}
               className={`hk-nav__item${active ? ' is-active' : ''}`}
               aria-current={active ? 'page' : undefined}
-              title={`Open ${item.name}`}
+              aria-label={collapsed ? t.name : undefined}
+              title={collapsed ? t.name : undefined}
             >
-              <NavIcon d={item.icon} />
-              {item.name}
+              <Icon d={t.icon} />
+              {!collapsed && <span>{t.name}</span>}
             </a>
           )
         })}
@@ -54,63 +51,69 @@ export function Sidebar({ activeSection = 'housekeeping' }) {
   )
 }
 
-export function Topbar({ user, search, onSearch, onLogout }) {
+// Top bar: page title (where the search bar used to be), bell, user and End session.
+export function Topbar({ title, subtitle, user, onLogout }) {
+  const [confirm, setConfirm] = useState(false)
+  const now = new Date()
   return (
     <header className="hk-topbar">
-      <div className="hk-topbar__search">
-        <SearchIcon />
-        <input
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search"
-          aria-label="Search the current page"
-        />
+      <div className="hk-topbar__title">
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </div>
       <div className="hk-user">
+        <span className="hk-topbar__date">
+          {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+        <NotificationBell />
         <span className="hk-user__avatar" aria-hidden="true">
-          {user.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}
+          <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />
         </span>
         <span className="hk-user__text">
           <strong>{user.name}</strong>
           <small>{user.position ? `Housekeeping ${user.position.toLowerCase()}` : user.role}</small>
         </span>
-        <button type="button" className="hk-btn hk-btn--ghost-light" onClick={onLogout}>
-          Log out
+        <button type="button" className="hk-btn hk-btn--end" onClick={() => setConfirm(true)}>
+          End session
         </button>
       </div>
+      {confirm && <EndSession onCancel={() => setConfirm(false)} onConfirm={onLogout} />}
     </header>
   )
 }
 
-export function PageHeader({ title, subtitle }) {
-  const now = new Date()
-  return (
-    <div className="hk-page-head">
-      <div>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
-      <div className="hk-page-head__date">
-        <span>{now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        <span>{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  )
-}
+// "End current session?" confirmation from the Figma design.
+function EndSession({ onCancel, onConfirm }) {
+  const [stats, setStats] = useState(null)
+  useEffect(() => {
+    api.dashboard().then((d) => setStats(d.stats)).catch(() => {})
+  }, [])
+  const openWork = stats && stats.open_tasks + stats.awaiting_inspection + stats.open_requests > 0
 
-export function Tabs({ current }) {
   return (
-    <nav className="hk-tabs" aria-label="Housekeeping functions">
-      {TABS.map((t) => (
-        <a
-          key={t.id}
-          href={`#/housekeeping/${t.id}`}
-          className={`hk-tab${t.id === current ? ' is-active' : ''}`}
-          aria-current={t.id === current ? 'page' : undefined}
-        >
-          {t.name}
-        </a>
-      ))}
-    </nav>
+    <Modal title="End current session?" onClose={onCancel} variant="confirm">
+      <div className="hk-confirm__head">End current session?</div>
+      <div className="hk-confirm__body">
+        <p>You'll leave this Housekeeping session and return to staff sign-in.</p>
+        {openWork && (
+          <Notice tone="amber" title="Unfinished work stays open">
+            {stats.open_tasks} cleaning task(s) remaining · {stats.awaiting_inspection} pending inspection(s)
+            <br />
+            {stats.open_requests} open guest request(s)
+            <br />
+            Ending this session does not end your shift, complete or cancel tasks, or release rooms.
+          </Notice>
+        )}
+        <p className="hk-confirm__hint">Choose No to return to the Housekeeping Dashboard and continue working.</p>
+        <div className="hk-actions">
+          <button type="button" className="hk-btn hk-btn--secondary" onClick={onCancel}>
+            No, continue working
+          </button>
+          <button type="button" className="hk-btn hk-btn--primary" onClick={onConfirm}>
+            Yes, end session
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }

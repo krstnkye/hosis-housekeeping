@@ -56,11 +56,12 @@ flowchart, UI screens, database dictionary, tests, and user manual.
 
 ### Sample accounts
 
-All passwords are `password123`.
+All passwords are `password123`. Staff sign in with their email (the
+username also works).
 
-| Username        | Position    | Can do                                              |
-| --------------- | ----------- | --------------------------------------------------- |
-| `hk.supervisor` | Supervisor  | Everything, incl. create/assign tasks and schedules |
+| Email / username | Position    | Can do                                              |
+| ---------------- | ----------- | --------------------------------------------------- |
+| `TabudloHK@gmail.com` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules |
 | `hk.inspector`  | Inspector   | Inspect rooms, plus general housekeeping functions  |
 | `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks, requests, lost & found, maintenance |
 | `fo.desk`       | Front Office | Is denied at the Housekeeping login                |
@@ -70,7 +71,8 @@ All passwords are `password123`.
 | Flowchart step | Screen | API |
 | -------------- | ------ | --- |
 | Housekeeping Staff Log In / Authorized? / Access Denied | Login | `POST /api/auth/login` with `department: HOUSEKEEPING` |
-| Housekeeping Dashboard / Select Function | Overview | `GET /dashboard` |
+| Housekeeping Dashboard | Dashboard (status boxes, task bar chart, room status donut) | `GET /rooms`, `GET /tasks` |
+| Notification bell (every page) | Top bar | `GET /alerts` |
 | HK-001 View Room Status | Room Status | `GET /rooms` |
 | HK-002 Select Room | Room Status (right panel) | `GET /rooms/:id` |
 | HK-003 Update Room Status (logged) | Room Status | `PATCH /rooms/:id/status` |
@@ -78,16 +80,17 @@ All passwords are `password123`.
 | HK-004 Create / Update Task | Cleaning Tasks | `POST /tasks`, `PATCH /tasks/:id` |
 | HK-005 Assign Housekeeper | Cleaning Tasks | `PATCH /tasks/:id` (`staffId`) |
 | HK-006 Perform Cleaning / Cleaning Completed? | Cleaning Tasks | `POST /tasks/:id/start`, `POST /tasks/:id/complete` |
-| HK-007 Inspect Room / Inspection Passed? | Inspection | `GET /inspections/queue`, `POST /inspections` |
+| HK-007 Inspect Room / Inspection Passed? | Room Inspection | `GET /tasks?status=`, `POST /inspections` |
+| Recent activity, inspection report (PDF / Excel) | Room Inspection | `GET /activity` (export runs in the browser) |
 | Mark CLEAN / INSPECTED or Return for Re-cleaning | Inspection | result `PASSED` or `FAILED` |
-| HK-008 View Staff Schedule | Schedules | `GET /schedules?date=` |
+| HK-008 View Staff Schedule | Schedules (calendar picker; housekeepers see their own shifts) | `GET /schedules?date=`, `GET /schedules/days?month=`, `GET /schedules/mine` |
 | HK-009 Create / Update Schedule, Assign Workload / Shift | Schedules | `POST /schedules`, `PATCH /schedules/:id` |
 | HK-010 Record Found Item, Store / Label Item | Lost & Found | `POST /lost-found` (label `LF-0001`) |
-| HK-011 Search / View Records | Lost & Found | `GET /lost-found?search=` |
+| HK-011 Search / View Records | Lost & Found (click a record to open it; Export PDF / Excel) | `GET /lost-found?status=` |
 | Valid Claim? / HK-012 Release Item | Lost & Found | `POST /lost-found/:id/claims` |
-| HK-013 Record Request, Assign / Process | Guest Requests | `POST /guest-requests`, `PATCH /guest-requests/:id` |
-| HK-014 Complete Request | Guest Requests | `POST /guest-requests/:id/complete` |
-| HK-015 Create Maintenance Request, Set Room OUT OF ORDER | Maintenance | `POST /maintenance` |
+| HK-013 Record Request, Assign / Process | Guest Request (Status and Priority filters; Export PDF / Excel) | `GET /guest-requests?view=all`, `POST /guest-requests`, `PATCH /guest-requests/:id` |
+| HK-014 Complete Request | Guest Request | `POST /guest-requests/:id/complete` |
+| HK-015 Create Maintenance Request, Set Room OUT OF ORDER | Maintenance (Submit & Notify) | `POST /maintenance`, `GET /maintenance?view=all` |
 | Engineering Completes Repair | Maintenance | `PATCH /maintenance/:id` (`status: REPAIRED`) |
 | Update Status / Create Cleaning Task | Maintenance | `POST /maintenance/:id/release` |
 
@@ -114,6 +117,34 @@ HOUSEKEEPING (or ADMIN) account.
   marks the repair REPAIRED, Housekeeping releases it: the room becomes DIRTY
   and a high-priority POST_REPAIR cleaning task is created.
 
+## UI revision (10/28/2026)
+
+Changes asked for by the professor:
+
+* Sidebar has a minimize button; collapsed, only the icons remain.
+* Login asks for the staff email (e.g. `TabudloHK@gmail.com`) and shows a red
+  warning under an empty field.
+* Every page shows its name as the title in the top bar, plus a notification
+  bell. The top search bar is gone; lists keep their own search box.
+* Dashboard: icons on the Occupied / Dirty / Clean / Inspected / Out of order
+  boxes, bar chart on the left, donut on the right, no "Select function".
+* Room Status: status filter chips instead of the status boxes.
+* Room Inspection: Progress filter, Priority column, small progress badges,
+  Recent activity, and an Export (PDF / Excel) report under the list.
+* Schedules: calendar picker; housekeepers get a "My schedule" panel.
+* Lost & Found and Guest Request: "Status" filter, Export dropdown at the top,
+  rows darken on hover and open in a pop-up.
+* Maintenance: Status filter, button renamed to "Submit & Notify".
+
+The layout follows the Figma screens (HOSIS-UI-HOUSEKEEPING-UI): a sidebar
+with the eight Housekeeping functions, the hotel photo and logo on the login
+page, an Access Denied pop-up for unauthorized accounts, and an End session
+button with a confirmation pop-up. The logo and photo in
+`frontend/src/modules/housekeeping/assets/` were taken from the Figma design.
+
+PDF and Excel files are generated in the browser with `jspdf`,
+`jspdf-autotable` and `write-excel-file`.
+
 ## Notes for the other HOSIS groups
 
 * Housekeeping tables use the `hk_` prefix so they never clash with other
@@ -132,6 +163,6 @@ HOUSEKEEPING (or ADMIN) account.
 ## Screenshots
 
 `docs/housekeeping/screenshots/` has screenshots of every screen taken from the
-running app with the sample data, plus the main flow
-(assign → clean → fail inspection → re-clean → pass → Front Office notified,
-item release, and maintenance release).
+running app with the sample data after the 10/28 UI revision, including the
+minimized menu, the notification bell, the Lost & Found and Guest Request
+pop-ups, a housekeeper's own schedule, Access Denied and End session.

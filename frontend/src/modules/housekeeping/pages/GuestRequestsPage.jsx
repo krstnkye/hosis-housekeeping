@@ -1,93 +1,135 @@
 import { useState } from 'react'
 import { api } from '../api.js'
+import ExportMenu from '../components/ExportMenu.jsx'
+import Modal from '../components/Modal.jsx'
 import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
-import { formatDateTime, formatTime, label, PRIORITIES } from '../format.js'
+import { formatDateTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
 
 const REQUEST_TYPES = ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER']
 
+const REPORT_COLUMNS = [
+  { title: 'Room', value: (r) => r.room_number },
+  { title: 'Request', value: (r) => label(r.request_type) },
+  { title: 'Details', value: (r) => r.request_details },
+  { title: 'Guest', value: (r) => r.guest_name?.trim() || '-' },
+  { title: 'Priority', value: (r) => label(r.priority) },
+  { title: 'Assigned', value: (r) => r.assigned_to?.trim() || 'Unassigned' },
+  { title: 'Status', value: (r) => label(r.request_status) },
+  { title: 'Requested', value: (r) => formatDateTime(r.requested_at) },
+]
+
 // HK-013 Record Request -> Assign / Process Request -> HK-014 Complete Request.
 export default function GuestRequestsPage({ search: topSearch }) {
   const [search, setSearch] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+  const [status, setStatus] = useState('')
+  const [priority, setPriority] = useState('')
+  const [openId, setOpenId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
-  const open = useLoad(() => api.guestRequests(), [])
-  const done = useLoad(() => api.guestRequests('?view=completed'), [])
+  const requests = useLoad(() => api.guestRequests('?view=all'), [])
   const lookups = useLoad(() => Promise.all([api.rooms(), api.staff(), api.guests()]), [])
 
   const query = (search || topSearch).toLowerCase()
-  const list = (open.data?.requests || []).filter(
-    (r) => !query || `${r.room_number} ${r.guest_name || ''} ${r.request_details}`.toLowerCase().includes(query)
+  const list = (requests.data?.requests || []).filter(
+    (r) =>
+      (!status || r.request_status === status) &&
+      (!priority || r.priority === priority) &&
+      (!query || `${r.room_number} ${r.guest_name || ''} ${r.request_details}`.toLowerCase().includes(query))
   )
-  const selected = creating ? null : list.find((r) => r.request_id === selectedId) || list[0]
-  const completed = done.data?.requests || []
+  const opened = (requests.data?.requests || []).find((r) => r.request_id === openId)
+  const openCount = (requests.data?.requests || []).filter((r) => r.request_status !== 'COMPLETED').length
 
   function refresh(msg) {
     setFlash(msg)
     setCreating(false)
-    setSelectedId(null)
-    open.reload()
-    done.reload()
+    setOpenId(null)
+    requests.reload()
+  }
+
+  const formProps = lookups.data && {
+    rooms: lookups.data[0].rooms,
+    staff: lookups.data[1].staff,
+    guests: lookups.data[2].guests,
+    onSaved: refresh,
   }
 
   return (
-    <div className="hk-grid">
-      <div className="hk-stack">
-        {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-        <Card title={`Open requests · ${list.length}`} subtitle="Sorted by priority, then time requested">
-          <div className="hk-toolbar">
-            <SearchBox value={search} onChange={setSearch} placeholder="Search guest or room" />
+    <div className="hk-stack">
+      {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
+      <Card
+        title="Guest request records"
+        subtitle={`${openCount} open · click a record to open its details`}
+        actions={
+          <div className="hk-actions">
+            <button type="button" className="hk-btn hk-btn--primary" onClick={() => setCreating(true)} disabled={!lookups.data}>+ Record request</button>
+            <ExportMenu title="Guest Requests" fileName="guest-requests" columns={REPORT_COLUMNS} rows={list} />
           </div>
-          <LoadState loading={open.loading && !open.data} error={open.error} />
-          <DataTable
-            rowKey="request_id"
-            rows={list}
-            selectedKey={selected?.request_id}
-            onSelect={(r) => {
-              setCreating(false)
-              setSelectedId(r.request_id)
-            }}
-            empty="No open guest requests."
-            columns={[
-              { key: 'room', title: 'Room / Request', render: (r) => <strong>{r.room_number} · {label(r.request_type)}</strong> },
-              { key: 'priority', title: 'Priority', render: (r) => <Badge value={r.priority} /> },
-              { key: 'staff', title: 'Assigned', render: (r) => r.assigned_to?.trim() || 'Unassigned' },
-              { key: 'status', title: 'Status', render: (r) => <Badge value={r.request_status} /> },
-            ]}
-          />
-        </Card>
-        <Card title={`Completed today · ${completed.length}`} subtitle="Kept separate from the open queue">
-          <ul className="hk-list">
-            {completed.map((r) => (
-              <li key={r.request_id}>
-                <span><Badge value="COMPLETED" /> Room {r.room_number} · {label(r.request_type)}</span>
-                <small>{r.assigned_to?.trim()} · {formatTime(r.completed_at)}</small>
-              </li>
-            ))}
-          </ul>
-          {completed.length === 0 && <p className="hk-muted">Nothing completed yet today.</p>}
-        </Card>
-      </div>
-
-      {lookups.data ? (
-        <RequestForm
-          key={selected?.request_id || 'new'}
-          request={selected}
-          rooms={lookups.data[0].rooms}
-          staff={lookups.data[1].staff}
-          guests={lookups.data[2].guests}
-          onNew={() => setCreating(true)}
-          onSaved={refresh}
+        }
+      >
+        <div className="hk-toolbar">
+          <SearchBox value={search} onChange={setSearch} placeholder="Search guest, room or request" />
+          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+            <option value="">Status</option>
+            <option value="OPEN">Open</option>
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} aria-label="Priority">
+            <option value="">Priority</option>
+            {PRIORITIES.map((p) => <option key={p} value={p}>{label(p)}</option>)}
+          </select>
+        </div>
+        <LoadState loading={requests.loading && !requests.data} error={requests.error} />
+        <DataTable
+          rowKey="request_id"
+          rows={list}
+          onSelect={(r) => setOpenId(r.request_id)}
+          empty="No guest requests match these filters."
+          columns={[
+            { key: 'room', title: 'Room / Request', render: (r) => <strong>{r.room_number} · {label(r.request_type)}</strong> },
+            { key: 'details', title: 'Details', render: (r) => r.request_details },
+            { key: 'priority', title: 'Priority', render: (r) => <Badge value={r.priority} /> },
+            { key: 'staff', title: 'Assigned', render: (r) => r.assigned_to?.trim() || 'Unassigned' },
+            { key: 'status', title: 'Status', render: (r) => <Badge value={r.request_status} /> },
+          ]}
         />
-      ) : (
-        <Card title="Request details"><LoadState loading={lookups.loading} error={lookups.error} /></Card>
+      </Card>
+
+      {opened && formProps && (
+        <Modal title={`Request for room ${opened.room_number}`} onClose={() => setOpenId(null)}>
+          {opened.request_status === 'COMPLETED' ? (
+            <CompletedRequest request={opened} />
+          ) : (
+            <RequestForm key={opened.request_id} request={opened} {...formProps} />
+          )}
+        </Modal>
+      )}
+      {creating && formProps && (
+        <Modal title="Record guest request" onClose={() => setCreating(false)}>
+          <RequestForm {...formProps} />
+        </Modal>
       )}
     </div>
   )
 }
 
-function RequestForm({ request, rooms, staff, guests, onNew, onSaved }) {
+function CompletedRequest({ request }) {
+  return (
+    <Card title={`Request details · Room ${request.room_number}`} subtitle={`Requested ${formatDateTime(request.requested_at)}`}>
+      <div className="hk-badges"><Badge value="COMPLETED" /><Badge value={request.priority}>{label(request.priority)} priority</Badge></div>
+      <p><strong>{label(request.request_type)}:</strong> {request.request_details}</p>
+      <ul className="hk-list">
+        <li><span>Guest</span><small>{request.guest_name?.trim() || '-'}</small></li>
+        <li><span>Handled by</span><small>{request.assigned_to?.trim() || '-'}</small></li>
+        <li><span>Completed</span><small>{formatDateTime(request.completed_at)}</small></li>
+        <li><span>Completion note</span><small>{request.completion_notes || '-'}</small></li>
+      </ul>
+    </Card>
+  )
+}
+
+function RequestForm({ request, rooms, staff, guests, onSaved }) {
   const [form, setForm] = useState({
     roomId: request?.room_id || '',
     guestId: request?.guest_id || '',
@@ -120,7 +162,6 @@ function RequestForm({ request, rooms, staff, guests, onNew, onSaved }) {
     <Card
       title={request ? `Request details · Room ${request.room_number}` : 'Record guest request'}
       subtitle={request ? `Requested ${formatDateTime(request.requested_at)}${request.guest_name?.trim() ? ` by ${request.guest_name}` : ''}` : 'Log a new housekeeping request from a guest'}
-      actions={request && <button type="button" className="hk-btn hk-btn--secondary" onClick={onNew}>+ Record new</button>}
     >
       {request && <div className="hk-badges"><Badge value={request.request_status} /><Badge value={request.priority}>{label(request.priority)} priority</Badge></div>}
       <div className="hk-form">
@@ -167,7 +208,6 @@ function RequestForm({ request, rooms, staff, guests, onNew, onSaved }) {
           Delivery confirmed with the guest or by the staff member
         </label>
       )}
-      <Notice tone="violet" title="Keep the open queue tidy">Completed requests move to "Completed today" and leave the open list.</Notice>
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
       <div className="hk-actions">
         <button

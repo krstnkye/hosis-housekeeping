@@ -16,19 +16,23 @@ const REQUEST_SELECT = `
     LEFT JOIN guests g ON g.guest_id = q.guest_id
     LEFT JOIN users u ON u.user_id = q.staff_id`;
 
-// Open requests, or completed requests for today (?view=completed).
+// Open requests (default), completed requests for today (?view=completed),
+// or every request (?view=all).
+const VIEWS = {
+  open: [`q.request_status <> 'COMPLETED'`],
+  completed: [`q.request_status = 'COMPLETED' AND q.completed_at::date = CURRENT_DATE`],
+  all: [],
+};
+
 router.get('/', async (req, res) => {
   const params = [];
-  const where =
-    req.query.view === 'completed'
-      ? [`q.request_status = 'COMPLETED' AND q.completed_at::date = CURRENT_DATE`]
-      : [`q.request_status <> 'COMPLETED'`];
+  const where = [...(VIEWS[req.query.view] || VIEWS.open)];
   if (req.query.search) {
     params.push(`%${req.query.search}%`);
     where.push(`(r.room_number ILIKE $1 OR q.request_details ILIKE $1 OR CONCAT(g.first_name, ' ', g.last_name) ILIKE $1)`);
   }
   const { rows } = await db.query(
-    `${REQUEST_SELECT} WHERE ${where.join(' AND ')}
+    `${REQUEST_SELECT} ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY CASE q.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
                q.requested_at`,
     params

@@ -1,46 +1,50 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox, Stat } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox, StatusChips } from '../components/ui.jsx'
 import { formatDateTime, label, ROOM_STATUSES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+
+// Occupancy column from the Figma design, derived from the room status.
+const OCCUPANCY = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', OUT_OF_ORDER: 'Blocked' }
 
 // HK-001 View Room Status, HK-002 Select Room, HK-003 Update Room Status.
 export default function RoomStatusPage({ search: topSearch }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
+  const [floor, setFloor] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const rooms = useLoad(() => api.rooms(filter ? `?status=${filter}` : ''), [filter])
 
   const query = (search || topSearch).toLowerCase()
+  const floors = [...new Set((rooms.data?.rooms || []).map((r) => r.floor_number))].sort()
   const list = (rooms.data?.rooms || []).filter(
-    (r) => !query || `${r.room_number} ${r.room_type} ${r.housekeeper || ''}`.toLowerCase().includes(query)
+    (r) =>
+      (!floor || String(r.floor_number) === floor) &&
+      (!query || `${r.room_number} ${r.room_type} ${r.housekeeper || ''}`.toLowerCase().includes(query))
   )
   const summary = rooms.data?.summary
   const activeId = selectedId ?? list[0]?.room_id
 
   return (
-    <div className="hk-stack">
-      {summary && (
-        <div className="hk-stats">
-          <Stat title="Occupied" value={summary.OCCUPIED} />
-          <Stat title="Dirty" value={summary.DIRTY} valueTone="amber" />
-          <Stat title="Clean" value={summary.CLEAN} note="Awaiting inspection" />
-          <Stat title="Inspected" value={summary.INSPECTED} note="Ready for Front Office" valueTone="green" />
-          <Stat title="Out of order" value={summary.OUT_OF_ORDER} valueTone="red" />
-        </div>
-      )}
-      <div className="hk-grid">
+    <div className="hk-grid">
         <Card
           title="Room overview"
           subtitle={summary ? `${summary.DIRTY} dirty · ${summary.CLEAN} clean · ${summary.OUT_OF_ORDER} out of order` : ''}
         >
+          <StatusChips
+            options={ROOM_STATUSES}
+            value={filter}
+            onChange={(v) => {
+              setFilter(v)
+              setSelectedId(null)
+            }}
+            counts={summary}
+          />
           <div className="hk-toolbar">
-            <SearchBox value={search} onChange={setSearch} placeholder="Search room number or type" />
-            <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter by status">
-              <option value="">All status</option>
-              {ROOM_STATUSES.map((s) => (
-                <option key={s} value={s}>{label(s)}</option>
-              ))}
+            <SearchBox value={search} onChange={setSearch} placeholder="Search room number" />
+            <select value={floor} onChange={(e) => setFloor(e.target.value)} aria-label="Floor">
+              <option value="">All floors</option>
+              {floors.map((f) => <option key={f} value={f}>Floor {f}</option>)}
             </select>
           </div>
           <LoadState loading={rooms.loading && !rooms.data} error={rooms.error} />
@@ -51,7 +55,8 @@ export default function RoomStatusPage({ search: topSearch }) {
             onSelect={(r) => setSelectedId(r.room_id)}
             columns={[
               { key: 'room', title: 'Room / Type', render: (r) => <strong>{r.room_number} · {r.room_type}</strong> },
-              { key: 'status', title: 'Status', render: (r) => <Badge value={r.room_status} /> },
+              { key: 'occupancy', title: 'Occupancy', render: (r) => OCCUPANCY[r.room_status] || 'Vacant' },
+              { key: 'status', title: 'HK status', render: (r) => <Badge value={r.room_status} /> },
               { key: 'hk', title: 'Housekeeper', render: (r) => r.housekeeper?.trim() || (r.task_id ? 'Unassigned' : '-') },
               { key: 'task', title: 'Cleaning task', render: (r) => (r.task_status ? label(r.task_status) : '-') },
             ]}
@@ -63,7 +68,6 @@ export default function RoomStatusPage({ search: topSearch }) {
         ) : (
           <Card title="Room details"><p className="hk-muted">Select a room.</p></Card>
         )}
-      </div>
     </div>
   )
 }

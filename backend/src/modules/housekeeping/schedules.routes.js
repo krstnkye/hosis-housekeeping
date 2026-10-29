@@ -48,6 +48,36 @@ router.get('/', async (req, res) => {
   res.json({ date, schedules: rows, coverage });
 });
 
+// HK-008 for housekeepers: the logged-in staff member's own upcoming shifts.
+router.get('/mine', async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT s.*, TO_CHAR(s.shift_date, 'YYYY-MM-DD') AS shift_date,
+            (SELECT COUNT(*)::int FROM hk_cleaning_tasks t
+              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date) AS assigned_tasks
+       FROM hk_schedules s
+      WHERE s.staff_id = $1 AND s.shift_date >= CURRENT_DATE - 7
+      ORDER BY s.shift_date, s.start_time`,
+    [req.user.userId]
+  );
+  res.json({ schedules: rows });
+});
+
+// Days in a month that have at least one shift (dots on the calendar picker).
+router.get('/days', async (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new HttpError(400, 'month must be in YYYY-MM format.');
+  }
+  const { rows } = await db.query(
+    `SELECT TO_CHAR(shift_date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS shifts
+       FROM hk_schedules
+      WHERE TO_CHAR(shift_date, 'YYYY-MM') = $1
+      GROUP BY shift_date ORDER BY shift_date`,
+    [month]
+  );
+  res.json({ days: rows });
+});
+
 // HK-009: create a schedule entry (assign shift and work area).
 router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
   const body = req.body;

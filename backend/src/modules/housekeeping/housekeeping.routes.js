@@ -37,6 +37,52 @@ router.get('/dashboard', async (req, res) => {
   res.json({ stats: rows[0] });
 });
 
+// Notification bell: things that need this user's attention right now.
+router.get('/alerts', async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT * FROM (
+       SELECT 'ROOM_READY' AS type, n.message, n.created_at AS at, 'rooms' AS page
+         FROM hk_front_office_notifications n
+        WHERE n.created_at > NOW() - INTERVAL '1 day'
+       UNION ALL
+       SELECT 'TASK', CONCAT('Room ', r.room_number, ': ', LOWER(REPLACE(t.task_type, '_', ' ')),
+              CASE WHEN t.task_status = 'RETURNED' THEN ' returned for re-cleaning' ELSE ' assigned to you' END),
+              t.created_at, 'tasks'
+         FROM hk_cleaning_tasks t JOIN rooms r ON r.room_id = t.room_id
+        WHERE t.staff_id = $1 AND t.task_status IN ('ASSIGNED', 'RETURNED')
+       UNION ALL
+       SELECT 'INSPECTION', CONCAT('Room ', r.room_number, ' is waiting for inspection'), t.completion_time, 'inspection'
+         FROM hk_cleaning_tasks t JOIN rooms r ON r.room_id = t.room_id
+        WHERE t.task_status = 'COMPLETED' AND $2
+       UNION ALL
+       SELECT 'REQUEST', CONCAT('Room ', r.room_number, ': ', LOWER(REPLACE(q.request_type, '_', ' ')), ' request (', LOWER(q.priority), ')'),
+              q.requested_at, 'requests'
+         FROM hk_guest_requests q JOIN rooms r ON r.room_id = q.room_id
+        WHERE q.request_status = 'OPEN'
+       UNION ALL
+       SELECT 'MAINTENANCE', CONCAT('Room ', r.room_number, ' repair finished, ready to release'), m.resolved_at, 'maintenance'
+         FROM hk_maintenance_requests m JOIN rooms r ON r.room_id = m.room_id
+        WHERE m.status = 'REPAIRED'
+     ) a
+     ORDER BY at DESC NULLS LAST LIMIT 15`,
+    [req.user.userId, ['INSPECTOR', 'SUPERVISOR'].includes(req.user.position) || req.user.role === 'ADMIN']
+  );
+  res.json({ alerts: rows });
+});
+
+// Recent activity: the latest room status changes (shown on the Inspection page).
+router.get('/activity', async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT l.log_id, l.previous_status, l.new_status, l.remarks, l.changed_at, r.room_number,
+            CONCAT(u.first_name, ' ', u.last_name) AS changed_by
+       FROM hk_room_status_logs l
+       JOIN rooms r ON r.room_id = l.room_id
+       LEFT JOIN users u ON u.user_id = l.staff_id
+      ORDER BY l.changed_at DESC, l.log_id DESC LIMIT 15`
+  );
+  res.json({ activity: rows });
+});
+
 // Lookups for dropdowns.
 router.get('/staff', async (req, res) => {
   const { rows } = await db.query(

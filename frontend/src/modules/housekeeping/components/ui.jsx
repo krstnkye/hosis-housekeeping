@@ -114,3 +114,24 @@ export function SearchIcon() {
     </svg>
   )
 }
+
+// Row of filter chips; "All" plus one chip per value, with optional counts.
+export function StatusChips({ options, value, onChange, counts, allLabel = 'All' }) {
+  const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : null
+  return (
+    <div className="hk-chips" role="group" aria-label="Filter by status">
+      {[['', allLabel, total], ...options.map((o) => [o, label(o), counts?.[o]])].map(([v, text, n]) => (
+        <button
+          key={v || 'all'}
+          type="button"
+          className={`hk-chip${value === v ? ' is-active' : ''}`}
+          aria-pressed={value === v}
+          onClick={() => onChange(v)}
+        >
+          {text}
+          {n !== undefined && n !== null && <span>{n}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}

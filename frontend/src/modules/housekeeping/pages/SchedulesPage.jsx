@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
-import { addDays, formatTime, label, todayISO } from '../format.js'
+import Calendar from '../components/Calendar.jsx'
+import { formatTime, label, todayISO } from '../format.js'
 import { useLoad } from '../useLoad.js'
 
 const SHIFT_TIMES = {
@@ -31,13 +32,14 @@ export default function SchedulesPage({ user, search }) {
     <div className="hk-grid">
       <div className="hk-stack">
         {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
+        <Card title="Pick a date" subtitle="Days with a dot have shifts scheduled">
+          <Calendar value={date} onChange={setDate} today={todayISO()} />
+        </Card>
         <Card title="Staff schedule" subtitle="Housekeepers, inspectors and supervisors on duty">
           <div className="hk-toolbar">
-            <div className="hk-date-nav">
-              <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setDate(addDays(date, -1))} aria-label="Previous day">‹</button>
-              <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
-              <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setDate(addDays(date, 1))} aria-label="Next day">›</button>
-            </div>
+            <strong className="hk-date-label">
+              {new Date(`${date}T00:00:00`).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </strong>
             <Badge value="AVAILABLE">{rows.length} staff on duty</Badge>
           </div>
           <LoadState loading={schedules.loading && !schedules.data} error={schedules.error} />
@@ -78,7 +80,9 @@ export default function SchedulesPage({ user, search }) {
         )}
       </div>
 
-      {staff.data ? (
+      {!isSupervisor ? (
+        <MySchedule user={user} />
+      ) : staff.data ? (
         <ScheduleForm
           key={selected?.schedule_id || `new-${date}`}
           schedule={selected}
@@ -187,6 +191,44 @@ function ScheduleForm({ schedule, date, staff, isSupervisor, onNew, onSaved }) {
           </button>
         </div>
       )}
+    </Card>
+  )
+}
+
+// Housekeepers and inspectors see their own upcoming shifts.
+function MySchedule({ user }) {
+  const mine = useLoad(() => api.mySchedule(), [])
+  const today = todayISO()
+  const list = mine.data?.schedules || []
+  const upcoming = list.filter((s) => s.shift_date >= today)
+  const next = upcoming[0]
+
+  return (
+    <Card title="My schedule" subtitle={`Shifts for ${user.name}`}>
+      <LoadState loading={mine.loading && !mine.data} error={mine.error} />
+      {next && (
+        <div className="hk-next-shift">
+          <span>{next.shift_date === today ? 'Today' : 'Next shift'}</span>
+          <strong>{label(next.shift)} · {formatTime(next.start_time)} - {formatTime(next.end_time)}</strong>
+          <small>
+            {new Date(`${next.shift_date}T00:00:00`).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+            {' · '}{next.assigned_area} · {next.assigned_tasks} cleaning task(s)
+          </small>
+        </div>
+      )}
+      {mine.data && upcoming.length === 0 && <p className="hk-muted">You have no upcoming shifts. Ask your supervisor.</p>}
+      <ul className="hk-list">
+        {upcoming.slice(1).map((s) => (
+          <li key={s.schedule_id}>
+            <span>
+              <strong>{new Date(`${s.shift_date}T00:00:00`).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+              {' · '}{label(s.shift)} {formatTime(s.start_time)} - {formatTime(s.end_time)}
+            </span>
+            <small>{s.assigned_area}</small>
+          </li>
+        ))}
+      </ul>
+      <Notice tone="violet" title="Need a change?">Only supervisors can change shifts. Talk to your supervisor if you need a swap.</Notice>
     </Card>
   )
 }

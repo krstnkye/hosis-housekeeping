@@ -53,11 +53,12 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 
 ### Sample accounts
 
-All passwords are `password123`.
+All passwords are `password123`. Staff sign in with their email (the
+username also works).
 
-| Username        | Position    | Can do                                              |
-| --------------- | ----------- | --------------------------------------------------- |
-| `hk.supervisor` | Supervisor  | Everything, incl. create/assign tasks and schedules |
+| Email / username | Position    | Can do                                              |
+| ---------------- | ----------- | --------------------------------------------------- |
+| `TabudloHK@gmail.com` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules |
 | `hk.inspector`  | Inspector   | Inspect rooms, plus general housekeeping functions  |
 | `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks, requests, lost & found, maintenance |
 | `fo.desk`       | Front Office | Is denied at the Housekeeping login                |

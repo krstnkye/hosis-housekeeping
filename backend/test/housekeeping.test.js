@@ -248,3 +248,27 @@ test('schedules: supervisor creates, invalid times rejected', async () => {
   assert.equal(list.body.schedules.length, 1);
   assert.equal(list.body.coverage.MORNING, 1);
 });
+
+test('login with email, alerts, activity and my schedule', async () => {
+  const byEmail = await api('POST', '/auth/login', {
+    body: { username: 'tabudlohk@gmail.com', password: 'password123', department: 'HOUSEKEEPING' },
+  });
+  assert.equal(byEmail.status, 200);
+  assert.equal(byEmail.body.user.username, 'hk.supervisor');
+
+  const joy = await login('hk.joy');
+  const alerts = await api('GET', '/housekeeping/alerts', { token: joy.token });
+  assert.equal(alerts.status, 200);
+  assert.ok(alerts.body.alerts.some((a) => a.type === 'TASK'));
+
+  const activity = await api('GET', '/housekeeping/activity', { token: joy.token });
+  assert.ok(activity.body.activity.length > 0);
+
+  const mine = await api('GET', '/housekeeping/schedules/mine', { token: joy.token });
+  assert.ok(mine.body.schedules.length >= 1);
+  const days = await api('GET', '/housekeeping/schedules/days', { token: joy.token });
+  assert.ok(days.body.days.length >= 1);
+
+  const all = await api('GET', '/housekeeping/guest-requests?view=all', { token: joy.token });
+  assert.ok(all.body.requests.some((r) => r.request_status === 'COMPLETED'));
+});

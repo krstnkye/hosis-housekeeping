@@ -67,6 +67,8 @@ export const api = {
   staff: () => request('GET', `${HK}/staff`),
   guests: () => request('GET', `${HK}/guests`),
   notifications: () => request('GET', `${HK}/notifications`),
+  alerts: () => request('GET', `${HK}/alerts`),
+  activity: () => request('GET', `${HK}/activity`),
 
   rooms: (q = '') => request('GET', `${HK}/rooms${q}`),
   room: (id) => request('GET', `${HK}/rooms/${id}`),
@@ -84,6 +86,8 @@ export const api = {
   inspect: (body) => request('POST', `${HK}/inspections`, body),
 
   schedules: (date) => request('GET', `${HK}/schedules?date=${date}`),
+  mySchedule: () => request('GET', `${HK}/schedules/mine`),
+  scheduleDays: (month) => request('GET', `${HK}/schedules/days?month=${month}`),
   createSchedule: (body) => request('POST', `${HK}/schedules`, body),
   updateSchedule: (id, body) => request('PATCH', `${HK}/schedules/${id}`, body),
 

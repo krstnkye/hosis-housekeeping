@@ -17,10 +17,12 @@ const RELEASE_CHECKS = [
 export default function MaintenancePage() {
   const [selectedId, setSelectedId] = useState(null)
   const [flash, setFlash] = useState(null)
-  const issues = useLoad(() => api.maintenance(), [])
+  const [status, setStatus] = useState('')
+  const issues = useLoad(() => api.maintenance('?view=all'), [])
   const rooms = useLoad(() => api.rooms(), [])
 
-  const list = issues.data?.requests || []
+  const all = issues.data?.requests || []
+  const list = all.filter((r) => (status ? r.status === status : r.status !== 'CLOSED'))
   const selected = list.find((r) => r.request_id === selectedId) || list[0]
 
   function refresh(msg, id) {
@@ -35,7 +37,13 @@ export default function MaintenancePage() {
       <div className="hk-stack">
         {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
         {rooms.data && <ReportForm rooms={rooms.data.rooms} onSaved={refresh} />}
-        <Card title={`Open issues · ${list.length}`}>
+        <Card title={`Maintenance issues · ${list.length}`} subtitle={status ? label(status) : 'All open issues'}>
+          <div className="hk-toolbar">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+              <option value="">Status</option>
+              {['REPORTED', 'IN_PROGRESS', 'REPAIRED', 'CLOSED'].map((s) => <option key={s} value={s}>{label(s)}</option>)}
+            </select>
+          </div>
           <LoadState loading={issues.loading && !issues.data} error={issues.error} />
           <DataTable
             rowKey="request_id"
@@ -52,7 +60,12 @@ export default function MaintenancePage() {
         </Card>
       </div>
       <div className="hk-stack">
-        {selected ? (
+        {selected && selected.status === 'CLOSED' ? (
+          <Card title={`Room ${selected.room_number} · Issue closed`} subtitle={`Request #${selected.request_id}`}>
+            <p>{label(selected.issue_category)}: {selected.issue_description}</p>
+            <p className="hk-muted">Repaired {formatDateTime(selected.resolved_at)} and released to Housekeeping for cleaning.</p>
+          </Card>
+        ) : selected ? (
           <IssueTracker key={`${selected.request_id}-${selected.status}`} issue={selected} onSaved={refresh} />
         ) : (
           <Card title="Issue tracker"><p className="hk-muted">No open issues.</p></Card>
@@ -79,7 +92,7 @@ function ReportForm({ rooms, onSaved }) {
       onSaved(
         {
           tone: 'green',
-          title: `Issue sent to Engineering (request #${request.request_id})`,
+          title: `Submitted and Engineering notified (request #${request.request_id})`,
           text: form.setOutOfOrder ? `Room ${room.room_number} is now OUT OF ORDER.` : undefined,
         },
         request.request_id
@@ -126,7 +139,7 @@ function ReportForm({ rooms, onSaved }) {
       {error && <Notice tone="red" title="Not sent">{error}</Notice>}
       <div className="hk-actions">
         <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !form.roomId || !form.description} onClick={save}>
-          Send to Engineering
+          Submit &amp; Notify
         </button>
       </div>
     </Card>

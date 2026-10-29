@@ -2,20 +2,22 @@
 -- HOSIS - Housekeeping sample data (for development and demo only)
 --
 -- All accounts use the password: password123
---   hk.supervisor  Housekeeping supervisor (can assign tasks and schedules)
+-- Staff can sign in with their email or username.
+--   hk.supervisor  Housekeeping supervisor (can assign tasks and schedules),
+--                  email TabudloHK@gmail.com
 --   hk.inspector   Housekeeping inspector  (can inspect rooms)
 --   hk.liza / hk.joy / hk.mark  Housekeepers
 --   fo.desk        Front Office account, used to show "Access denied"
 -- Dates are relative to CURRENT_DATE so the demo always looks current.
 -- =====================================================================
 
-INSERT INTO users (first_name, last_name, username, password_hash, role, position) VALUES
-    ('Maria', 'Santos',    'hk.supervisor', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'SUPERVISOR'),
-    ('Ana',   'Reyes',     'hk.inspector',  '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'INSPECTOR'),
-    ('Liza',  'Cruz',      'hk.liza',       '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Joy',   'Dela Cruz', 'hk.joy',        '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Mark',  'Tan',       'hk.mark',       '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Paolo', 'Garcia',    'fo.desk',       '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL)
+INSERT INTO users (first_name, last_name, username, email, password_hash, role, position) VALUES
+    ('Maria', 'Santos',    'hk.supervisor', 'TabudloHK@gmail.com', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'SUPERVISOR'),
+    ('Ana',   'Reyes',     'hk.inspector',  'ana.reyes@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'INSPECTOR'),
+    ('Liza',  'Cruz',      'hk.liza',       'liza.cruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL)
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES
@@ -93,3 +95,15 @@ INSERT INTO hk_maintenance_requests (room_id, reported_by, issue_category, issue
 SELECT r.room_id, u.user_id, 'AIRCON', 'Aircon not cooling and leaking water onto the carpet', 'HIGH', 'IN_PROGRESS', TRUE
 FROM rooms r, users u
 WHERE r.room_number = '302' AND u.username = 'hk.liza';
+
+-- Recent room status changes (shown under Recent activity on the Inspection page).
+INSERT INTO hk_room_status_logs (room_id, staff_id, previous_status, new_status, remarks, changed_at)
+SELECT r.room_id, u.user_id, l.prev, l.next, l.remarks, NOW() - l.age::interval
+FROM (VALUES
+    ('203', 'hk.inspector', 'CLEAN',     'INSPECTED',    'Inspection passed',              '3 hours'),
+    ('302', 'hk.liza',      'AVAILABLE', 'OUT_OF_ORDER', 'Maintenance request #1: AIRCON', '3 hours'),
+    ('205', 'hk.liza',      'DIRTY',     'CLEAN',        'Cleaning task completed',        '10 minutes'),
+    ('104', 'hk.mark',      'DIRTY',     'CLEAN',        'Cleaning task completed',        '10 minutes')
+) AS l(room_number, username, prev, next, remarks, age)
+JOIN rooms r ON r.room_number = l.room_number
+JOIN users u ON u.username = l.username;
