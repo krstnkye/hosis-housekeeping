@@ -9,10 +9,10 @@ const PATHS = {
   OUT_OF_ORDER: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z',
 }
 
-export default function StatusIcon({ status }) {
+export default function StatusIcon({ status, small }) {
   return (
-    <span className={`hk-status-icon hk-status-icon--${status.toLowerCase()}`}>
-      <Icon d={PATHS[status]} size={22} />
+    <span className={`hk-status-icon hk-status-icon--${status.toLowerCase()}${small ? ' hk-status-icon--small' : ''}`}>
+      <Icon d={PATHS[status]} size={small ? 13 : 22} />
     </span>
   )
 }

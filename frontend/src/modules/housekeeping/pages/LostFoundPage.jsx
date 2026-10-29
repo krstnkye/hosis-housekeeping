@@ -20,6 +20,7 @@ const REPORT_COLUMNS = [
 export default function LostFoundPage({ search: topSearch }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
   const [openId, setOpenId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
@@ -31,12 +32,14 @@ export default function LostFoundPage({ search: topSearch }) {
   const list = (items.data?.items || [])
     .map((i) => (itemOverrides[i.item_id] ? { ...i, ...itemOverrides[i.item_id] } : i))
     .filter((i) => !query || `${i.storage_label} ${i.item_description} ${i.room_number || ''}`.toLowerCase().includes(query))
+  const selected = list.find((i) => i.item_id === selectedId) || list[0]
   const opened = list.find((i) => i.item_id === openId)
 
   function refresh(msg, itemId, updatedItem) {
     setFlash(msg)
     setCreating(false)
     setOpenId(null)
+    if (itemId) setSelectedId(itemId)
     if (updatedItem) {
       setItemOverrides((current) => ({ ...current, [updatedItem.item_id]: updatedItem }))
     }
@@ -46,45 +49,76 @@ export default function LostFoundPage({ search: topSearch }) {
   return (
     <div className="hk-stack">
       {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-      <Card
-        title="Found item records"
-        subtitle="Click a record to open its details"
-        actions={
-          <div className="hk-actions">
-            <button type="button" className="hk-btn hk-btn--primary" onClick={() => setCreating(true)}>+ Record found item</button>
-            <ExportMenu title="Lost & Found Records" fileName="lost-and-found" columns={REPORT_COLUMNS} rows={list} />
+      <div className="hk-grid">
+        <Card
+          title="Found item records"
+          subtitle="Select a record to see its details"
+          actions={
+            <div className="hk-actions">
+              <ExportMenu title="Lost & Found Records" fileName="lost-and-found" columns={REPORT_COLUMNS} rows={list} />
+              <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+                <option value="">Status</option>
+                <option value="STORED">Stored</option>
+                <option value="RELEASED">Released</option>
+                <option value="DISPOSED">Disposed</option>
+              </select>
+            </div>
+          }
+        >
+          <div className="hk-toolbar">
+            <SearchBox value={search} onChange={setSearch} placeholder="Search label, item or room" />
           </div>
-        }
-      >
-        <div className="hk-toolbar">
-          <SearchBox value={search} onChange={setSearch} placeholder="Search label, item or room" />
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
-            <option value="">Status</option>
-            <option value="STORED">Stored</option>
-            <option value="RELEASED">Released</option>
-            <option value="DISPOSED">Disposed</option>
-          </select>
+          <LoadState loading={items.loading && !items.data} error={items.error} />
+          <DataTable
+            rowKey="item_id"
+            rows={list}
+            selectedKey={selected?.item_id}
+            onSelect={(i) => setSelectedId(i.item_id)}
+            darkHover
+            empty="No found items recorded."
+            columns={[
+              { key: 'ref', title: 'Reference', render: (i) => <strong>{i.storage_label}</strong> },
+              { key: 'item', title: 'Item', render: (i) => i.item_description },
+              { key: 'found', title: 'Found', render: (i) => <span>{i.room_number ? `Room ${i.room_number}` : i.found_location}<small className="hk-block">{formatDateTime(i.found_at)}</small></span> },
+              { key: 'status', title: 'Status', render: (i) => <Badge value={i.item_status} /> },
+            ]}
+          />
+          <div className="hk-actions hk-actions--split">
+            <button type="button" className="hk-btn hk-btn--secondary" disabled={!selected} onClick={() => setOpenId(selected.item_id)}>
+              View selected record →
+            </button>
+            <button type="button" className="hk-btn hk-btn--primary" onClick={() => setCreating(true)}>+ Record found item</button>
+          </div>
+        </Card>
+
+        <div className="hk-stack">
+          {selected ? (
+            <>
+              <Card title="Found item detail" subtitle={`Recorded by ${selected.found_by_name}`} actions={<Badge value={selected.item_status} />}>
+                <dl className="hk-facts">
+                  <dt>Reference</dt><dd>{selected.storage_label}</dd>
+                  <dt>Item</dt><dd>{selected.item_description}</dd>
+                  <dt>Found</dt><dd>{selected.room_number ? `Room ${selected.room_number} · ` : ''}{selected.found_location}</dd>
+                  <dt>Date / time</dt><dd>{formatDateTime(selected.found_at)}</dd>
+                  <dt>Storage</dt><dd>{selected.storage_location}</dd>
+                </dl>
+                <div className="hk-actions">
+                  <button type="button" className="hk-btn hk-btn--primary" onClick={() => setOpenId(selected.item_id)}>
+                    {selected.item_status === 'STORED' ? 'Found item → verify claim' : 'Found item →'}
+                  </button>
+                </div>
+              </Card>
+              <ClaimHistory item={selected} />
+            </>
+          ) : (
+            <Card title="Found item detail"><p className="hk-muted">No record selected.</p></Card>
+          )}
         </div>
-        <LoadState loading={items.loading && !items.data} error={items.error} />
-        <DataTable
-          rowKey="item_id"
-          rows={list}
-          onSelect={(i) => setOpenId(i.item_id)}
-          empty="No found items recorded."
-          columns={[
-            { key: 'ref', title: 'Reference', render: (i) => <strong>{i.storage_label}</strong> },
-            { key: 'item', title: 'Item', render: (i) => i.item_description },
-            { key: 'found', title: 'Found', render: (i) => <span>{i.room_number ? `Room ${i.room_number}` : i.found_location}<small className="hk-block">{formatDateTime(i.found_at)}</small></span> },
-            { key: 'storage', title: 'Storage', render: (i) => i.storage_location },
-            { key: 'status', title: 'Status', render: (i) => <Badge value={i.item_status} /> },
-          ]}
-        />
-      </Card>
+      </div>
 
       {opened && (
         <Modal title={`Found item ${opened.storage_label}`} onClose={() => setOpenId(null)}>
           <ItemDetail key={opened.item_id} item={opened} onSaved={refresh} />
-          <ClaimHistory item={opened} />
         </Modal>
       )}
       {creating && rooms.data && (
@@ -100,17 +134,17 @@ function ClaimHistory({ item }) {
   const claims = useLoad(() => api.itemClaims(item.item_id), [item.item_id, item.item_status])
   const list = claims.data?.claims || []
   return (
-    <Notice tone="violet" title="Chain of custody">
-      <div>
+    <Card title="Chain of custody">
+      <div className="hk-custody">
         {item.storage_label} found by {item.found_by_name} in {item.room_number ? `room ${item.room_number}` : item.found_location} ({item.found_location}),
         stored at {item.storage_location}.
       </div>
       {list.map((c) => (
-        <div key={c.claim_id}>
+        <div key={c.claim_id} className="hk-custody">
           {formatDateTime(c.claimed_at)}: claim by {c.claimant_name} {c.claim_status === 'VALID' ? 'verified and released' : 'rejected'} by {c.processed_by_name}.
         </div>
       ))}
-    </Notice>
+    </Card>
   )
 }
 

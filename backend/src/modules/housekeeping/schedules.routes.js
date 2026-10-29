@@ -37,7 +37,10 @@ router.get('/', async (req, res) => {
     `SELECT s.*, TO_CHAR(s.shift_date, 'YYYY-MM-DD') AS shift_date,
             CONCAT(u.first_name, ' ', u.last_name) AS staff_name, u.position,
             (SELECT COUNT(*)::int FROM hk_cleaning_tasks t
-              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date) AS assigned_tasks
+              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date) AS assigned_tasks,
+            (SELECT COUNT(*)::int FROM hk_cleaning_tasks t
+              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date
+                AND t.task_status IN ('COMPLETED', 'INSPECTED')) AS completed_tasks
        FROM hk_schedules s JOIN users u ON u.user_id = s.staff_id
       WHERE s.shift_date = $1
       ORDER BY s.start_time, staff_name`,
@@ -53,7 +56,10 @@ router.get('/mine', async (req, res) => {
   const { rows } = await db.query(
     `SELECT s.*, TO_CHAR(s.shift_date, 'YYYY-MM-DD') AS shift_date,
             (SELECT COUNT(*)::int FROM hk_cleaning_tasks t
-              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date) AS assigned_tasks
+              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date) AS assigned_tasks,
+            (SELECT COUNT(*)::int FROM hk_cleaning_tasks t
+              WHERE t.staff_id = s.staff_id AND t.assigned_date = s.shift_date
+                AND t.task_status IN ('COMPLETED', 'INSPECTED')) AS completed_tasks
        FROM hk_schedules s
       WHERE s.staff_id = $1 AND s.shift_date >= CURRENT_DATE - 7
       ORDER BY s.shift_date, s.start_time`,

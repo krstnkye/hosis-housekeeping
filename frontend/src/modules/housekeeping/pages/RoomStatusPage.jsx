@@ -25,21 +25,25 @@ export default function RoomStatusPage({ search: topSearch }) {
   const summary = rooms.data?.summary
   const activeId = selectedId ?? list[0]?.room_id
 
+  function pick(value) {
+    setFilter(value)
+    setSelectedId(null)
+  }
+
   return (
-    <div className="hk-grid">
+    <div className="hk-stack">
+      <div className="hk-filterbar">
+        <select value={filter} onChange={(e) => pick(e.target.value)} aria-label="Status">
+          <option value="">All statuses</option>
+          {ROOM_STATUSES.map((st) => <option key={st} value={st}>{label(st)}</option>)}
+        </select>
+        <StatusChips options={['CLEAN', 'DIRTY', 'INSPECTED', 'OUT_OF_ORDER']} value={filter} onChange={pick} counts={summary} />
+      </div>
+      <div className="hk-grid">
         <Card
           title="Room overview"
-          subtitle={summary ? `${summary.DIRTY} dirty · ${summary.CLEAN} clean · ${summary.OUT_OF_ORDER} out of order` : ''}
+          subtitle={summary ? `${list.length} of ${Object.values(summary).reduce((x, y) => x + y, 0)} rooms shown · ${summary.DIRTY} dirty · ${summary.OUT_OF_ORDER} out of order` : ''}
         >
-          <StatusChips
-            options={ROOM_STATUSES}
-            value={filter}
-            onChange={(v) => {
-              setFilter(v)
-              setSelectedId(null)
-            }}
-            counts={summary}
-          />
           <div className="hk-toolbar">
             <SearchBox value={search} onChange={setSearch} placeholder="Search room number" />
             <select value={floor} onChange={(e) => setFloor(e.target.value)} aria-label="Floor">
@@ -68,6 +72,7 @@ export default function RoomStatusPage({ search: topSearch }) {
         ) : (
           <Card title="Room details"><p className="hk-muted">Select a room.</p></Card>
         )}
+      </div>
     </div>
   )
 }

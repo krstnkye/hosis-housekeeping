@@ -1580,6 +1580,446 @@
   color: var(--hk-navy);
 }
 
+
+/* ---------- Figma v2 (10/29): bell left, page title in content, dark row hover ---------- */
+
+.hk-topbar {
+  padding: 10px 24px;
+  min-height: 56px;
+}
+
+.hk-topbar .hk-bell__btn {
+  width: 34px;
+  height: 34px;
+}
+
+.hk-user__text small {
+  font-size: 0.72rem;
+}
+
+.hk-btn--end {
+  background: #3d36e6;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+
+.hk-btn--end:hover {
+  background: var(--hk-gold);
+  color: var(--hk-navy);
+}
+
+.hk-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hk-page-head h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--hk-navy);
+}
+
+.hk-page-head p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--hk-navy);
+}
+
+.hk-page-head__side {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hk-page-head__clock {
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--hk-navy);
+  white-space: nowrap;
+}
+
+.hk-page-head__side .hk-actions:empty {
+  display: none;
+}
+
+.hk-sidebar__toggle {
+  align-self: flex-end;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  margin: -4px 0 0;
+}
+
+.hk-sidebar.is-collapsed .hk-brand {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.hk-sidebar.is-collapsed .hk-brand__mark {
+  width: 34px;
+}
+
+.hk-sidebar.is-collapsed .hk-nav__item {
+  width: 44px;
+  padding: 10px 0;
+  border-radius: 8px;
+}
+
+/* Rows darken on hover to show they open a record (Lost & Found, Guest Request). */
+.hk-table--dark-hover tbody tr[tabindex]:hover,
+.hk-table--dark-hover tbody tr[tabindex]:focus-visible {
+  background: #1a1265 !important;
+  color: #fff;
+}
+
+.hk-table--dark-hover tbody tr[tabindex]:hover .hk-badge {
+  filter: brightness(1.1);
+}
+
+/* Dashboard (Figma v2) */
+
+.hk-stat--figma {
+  gap: 4px;
+}
+
+.hk-stat--figma .hk-stat__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--hk-navy);
+  letter-spacing: 0.02em;
+}
+
+.hk-stat--figma .hk-stat__value {
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.hk-status-icon--small {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.hk-status-icon--small.hk-status-icon--occupied { background: #1a1265; color: #fff; }
+.hk-status-icon--small.hk-status-icon--dirty { background: #f5b800; color: #1a1265; }
+.hk-status-icon--small.hk-status-icon--clean { background: #4a72c9; color: #fff; }
+.hk-status-icon--small.hk-status-icon--inspected { background: #8a6a05; color: #fff; }
+.hk-status-icon--small.hk-status-icon--out_of_order { background: #d83a3a; color: #fff; }
+
+.hk-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 28px;
+  align-items: center;
+}
+
+.hk-overview .hk-donut svg {
+  width: 200px;
+}
+
+.hk-overview__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--hk-muted);
+  margin-bottom: 6px;
+}
+
+.hk-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hk-bars li {
+  display: grid;
+  grid-template-columns: 24px minmax(160px, 1fr) minmax(80px, 1.2fr) 28px;
+  align-items: center;
+  gap: 10px;
+}
+
+.hk-bars__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.hk-bars__text strong {
+  font-size: 0.85rem;
+  color: var(--hk-navy);
+}
+
+.hk-bars__text small {
+  font-size: 0.75rem;
+  color: var(--hk-muted);
+}
+
+.hk-bars__track {
+  height: 6px;
+  border-radius: 3px;
+  background: #e8e6ef;
+  overflow: hidden;
+}
+
+.hk-bars__track span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  min-width: 3px;
+}
+
+.hk-bars__count {
+  font-size: 0.8rem;
+  text-align: right;
+  color: var(--hk-navy);
+}
+
+.hk-list--plain li {
+  border-top: 0;
+  padding: 4px 0;
+  font-size: 0.88rem;
+  color: var(--hk-navy);
+}
+
+.hk-link {
+  color: var(--hk-navy);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.hk-link:hover {
+  text-decoration: underline;
+}
+
+.hk-workload--plain > div {
+  background: transparent;
+  padding: 0;
+}
+
+@media (max-width: 900px) {
+  .hk-overview {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hk-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hk-filterbar select {
+  width: auto;
+  min-width: 160px;
+}
+
+.hk-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--hk-navy);
+}
+
+.hk-inline-field select {
+  width: auto;
+}
+
+.hk-report-bar {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.hk-report-bar .hk-export > .hk-btn {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Figma v2: schedules */
+.hk-segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--hk-line);
+  border-radius: 999px;
+  padding: 3px;
+  background: #fff;
+}
+
+.hk-segmented button {
+  border: 0;
+  background: transparent;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--hk-navy);
+  cursor: pointer;
+}
+
+.hk-segmented button.is-active {
+  background: var(--hk-navy);
+  color: #fff;
+}
+
+.hk-datenav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.hk-datenav > :last-child:not(.hk-datenav__step) {
+  margin-left: auto;
+}
+
+.hk-datenav__step {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--hk-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--hk-navy);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.hk-datepicker {
+  position: relative;
+}
+
+.hk-datepicker__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--hk-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--hk-navy);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hk-field .hk-datepicker__button {
+  width: 100%;
+  font-weight: 400;
+}
+
+.hk-datepicker__button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hk-datepicker__pop {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--hk-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(26, 18, 101, 0.18);
+}
+
+.hk-datepicker__selected {
+  margin: 16px 0 0;
+  font-size: 0.8rem;
+  color: var(--hk-navy);
+  font-weight: 600;
+}
+
+.hk-stats--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Figma v2: record detail panels (Lost & Found, Guest Request) and Maintenance report */
+.hk-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+}
+
+.hk-facts dt {
+  color: var(--hk-muted);
+  font-weight: 600;
+}
+
+.hk-facts dd {
+  margin: 0;
+  color: var(--hk-navy);
+}
+
+.hk-actions--split {
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.hk-custody {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hk-line);
+}
+
+.hk-custody:last-child {
+  border-bottom: 0;
+}
+
+.hk-report-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--hk-line);
+  border-radius: 10px;
+  background: var(--hk-soft, #f6f5fb);
+}
+
+.hk-report-section strong {
+  color: var(--hk-navy);
+}
+
+.hk-page-head .hk-actions:empty {
+  display: none;
+}
+
+.hk-card__actions .hk-actions {
+  flex-wrap: nowrap;
+  margin: 0;
+}
+
+.hk-card__actions select {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 30px 6px 10px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 1100px) {
   .hk-grid,
   .hk-grid--narrow-left,

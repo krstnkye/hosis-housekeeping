@@ -50,7 +50,7 @@ export function BarChart({ data, color = '#2a23c9', height = 220, label }) {
 
 // Donut with a legend that lists every slice and its count.
 // data: [{ label, value, color }]
-export function DonutChart({ data, total, centerLabel, label }) {
+export function DonutChart({ data, total, centerLabel, label, hideLegend }) {
   const [hover, setHover] = useState(null)
   const sum = data.reduce((a, d) => a + d.value, 0) || 1
   const R = 70
@@ -79,10 +79,10 @@ export function DonutChart({ data, total, centerLabel, label }) {
             />
           ) : null
         )}
-        <text y="-2" textAnchor="middle" className="hk-donut__total">{shown ? shown.value : total ?? sum}</text>
-        <text y="16" textAnchor="middle" className="hk-donut__label">{shown ? shown.label : centerLabel}</text>
+        <text y="-12" textAnchor="middle" className="hk-donut__label">{shown ? shown.label : centerLabel}</text>
+        <text y="14" textAnchor="middle" className="hk-donut__total">{shown ? shown.value : total ?? sum}</text>
       </svg>
-      <ul className="hk-legend">
+      {!hideLegend && <ul className="hk-legend">
         {data.map((d, i) => (
           <li key={d.label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
             <span className="hk-legend__swatch" style={{ background: d.color }} />
@@ -90,7 +90,7 @@ export function DonutChart({ data, total, centerLabel, label }) {
             <strong>{d.value}</strong>
           </li>
         ))}
-      </ul>
+      </ul>}
     </div>
   )
 }

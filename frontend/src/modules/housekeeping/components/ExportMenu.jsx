@@ -3,7 +3,7 @@ import { exportExcel, exportPdf } from '../exportReport.js'
 
 // "Export" dropdown with PDF and Excel options.
 // columns: [{ title, value: (row) => text }]
-export default function ExportMenu({ title, fileName, columns, rows }) {
+export default function ExportMenu({ title, fileName, columns, rows, label = 'Export' }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState(null)
 
@@ -27,7 +27,7 @@ export default function ExportMenu({ title, fileName, columns, rows }) {
         onClick={() => setOpen(!open)}
         disabled={!rows.length}
       >
-        Export ▾
+        {label} ▾
       </button>
       {open && (
         <div className="hk-export__menu" role="menu">

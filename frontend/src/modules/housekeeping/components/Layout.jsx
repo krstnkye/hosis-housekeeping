@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { label } from '../format.js'
 import Icon from './Icon.jsx'
 import Modal from './Modal.jsx'
 import NotificationBell from './NotificationBell.jsx'
@@ -9,9 +10,17 @@ import logoSidebar from '../assets/logo-sidebar.png'
 import logoMark from '../assets/logo-mark.png'
 
 // Housekeeping menu from the Figma design. It can be minimized to icons only.
-export function Sidebar({ current, collapsed, onToggle }) {
+// Housekeepers see "My Schedule" in place of the supervisor's Schedules page.
+export function Sidebar({ current, collapsed, onToggle, tabs = TABS }) {
   return (
     <aside className={`hk-sidebar${collapsed ? ' is-collapsed' : ''}`}>
+      <div className="hk-brand">
+        <img
+          src={collapsed ? logoMark : logoSidebar}
+          alt="Grand Horizon Hotel - Stay, Relax, Belong"
+          className={collapsed ? 'hk-brand__mark' : 'hk-brand__logo'}
+        />
+      </div>
       <button
         type="button"
         className="hk-sidebar__toggle"
@@ -20,17 +29,10 @@ export function Sidebar({ current, collapsed, onToggle }) {
         aria-expanded={!collapsed}
         title={collapsed ? 'Expand menu' : 'Minimize menu'}
       >
-        <Icon d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
+        <Icon d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} size={16} />
       </button>
-      <div className="hk-brand">
-        <img
-          src={collapsed ? logoMark : logoSidebar}
-          alt="Grand Horizon Hotel - Stay, Relax, Belong"
-          className={collapsed ? 'hk-brand__mark' : 'hk-brand__logo'}
-        />
-      </div>
       <nav className="hk-nav" aria-label="Housekeeping functions">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const active = t.id === current
           return (
             <a
@@ -51,27 +53,20 @@ export function Sidebar({ current, collapsed, onToggle }) {
   )
 }
 
-// Top bar: page title (where the search bar used to be), bell, user and End session.
-export function Topbar({ title, subtitle, user, onLogout }) {
+// Top bar from the Figma design: notification bell on the left, the signed-in
+// staff member and End session on the right.
+export function Topbar({ user, onLogout }) {
   const [confirm, setConfirm] = useState(false)
-  const now = new Date()
   return (
     <header className="hk-topbar">
-      <div className="hk-topbar__title">
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
+      <NotificationBell />
       <div className="hk-user">
-        <span className="hk-topbar__date">
-          {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-        </span>
-        <NotificationBell />
         <span className="hk-user__avatar" aria-hidden="true">
-          <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />
+          <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" size={18} />
         </span>
         <span className="hk-user__text">
           <strong>{user.name}</strong>
-          <small>{user.position ? `Housekeeping ${user.position.toLowerCase()}` : user.role}</small>
+          <small>{user.position ? `Housekeeping ${label(user.position)} · Shared session active` : user.role}</small>
         </span>
         <button type="button" className="hk-btn hk-btn--end" onClick={() => setConfirm(true)}>
           End session
@@ -79,6 +74,31 @@ export function Topbar({ title, subtitle, user, onLogout }) {
       </div>
       {confirm && <EndSession onCancel={() => setConfirm(false)} onConfirm={onLogout} />}
     </header>
+  )
+}
+
+// Page title with today's date and a clock, as in every Figma frame.
+export function PageHeader({ title, subtitle, actions }) {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 15000)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <div className="hk-page-head">
+      <div>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+      <div className="hk-page-head__side">
+        {actions}
+        <time className="hk-page-head__clock" dateTime={now.toISOString()}>
+          {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+          <br />
+          {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        </time>
+      </div>
+    </div>
   )
 }
 

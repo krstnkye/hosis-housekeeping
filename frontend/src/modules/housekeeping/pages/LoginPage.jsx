@@ -63,9 +63,9 @@ export default function LoginPage({ onLogin }) {
           )}
 
           <label className={`hk-field${missing.username ? ' is-invalid' : ''}`}>
-            <span className="hk-field__label">Staff email</span>
+            <span className="hk-field__label">Staff username</span>
             <input
-              type="email"
+              type="text"
               value={form.username}
               onChange={set('username')}
               autoComplete="username"
@@ -73,7 +73,7 @@ export default function LoginPage({ onLogin }) {
               aria-invalid={missing.username || undefined}
               aria-describedby={missing.username ? 'login-email-error' : undefined}
             />
-            {missing.username && <span className="hk-field__error" id="login-email-error">Please enter your staff email.</span>}
+            {missing.username && <span className="hk-field__error" id="login-email-error">Staff username is required</span>}
           </label>
 
           <label className={`hk-field${missing.password ? ' is-invalid' : ''}`}>

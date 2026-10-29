@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
+import { exportPdf } from '../exportReport.js'
 import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
@@ -14,9 +15,9 @@ const CHECKLIST = [
 ]
 
 const PROGRESS = [
-  { value: 'COMPLETED', text: 'Awaiting inspection', short: 'Awaiting' },
-  { value: 'RETURNED', text: 'Returned for re-cleaning', short: 'Returned' },
-  { value: 'INSPECTED', text: 'Passed', short: 'Passed' },
+  { value: 'COMPLETED', text: 'Awaiting inspection' },
+  { value: 'RETURNED', text: 'Returned for re-cleaning' },
+  { value: 'INSPECTED', text: 'Passed' },
   { value: '', text: 'All progress' },
 ]
 
@@ -29,9 +30,8 @@ const REPORT_COLUMNS = [
   { title: 'Finished', value: (t) => formatDateTime(t.completion_time) },
 ]
 
-function progressText(status, short = false) {
-  const p = PROGRESS.find((x) => x.value === status)
-  return (short ? p?.short : p?.text) || label(status)
+function progressText(status) {
+  return PROGRESS.find((p) => p.value === status)?.text || label(status)
 }
 
 // HK-007 Inspect Room -> Inspection Passed? -> Mark INSPECTED / Return for Re-cleaning.
@@ -57,12 +57,13 @@ export default function InspectionPage({ user }) {
     <div className="hk-grid hk-grid--narrow-left">
       <div className="hk-stack">
         {flash && <Notice tone={flash.tone} title={flash.title}>{flash.text}</Notice>}
-        <Card title="Inspection list" subtitle={`${waiting} room(s) waiting for inspection`}>
-          <div className="hk-toolbar">
-            <select value={progress} onChange={(e) => setProgress(e.target.value)} aria-label="Filter by progress">
+        <Card title={`Awaiting inspection · ${waiting}`} subtitle="CLEAN rooms are not yet approved.">
+          <label className="hk-inline-field">
+            Progress
+            <select value={progress} onChange={(e) => setProgress(e.target.value)}>
               {PROGRESS.map((p) => <option key={p.value} value={p.value}>{p.text}</option>)}
             </select>
-          </div>
+          </label>
           <LoadState loading={list.loading && !list.data} error={list.error} />
           <DataTable
             rowKey="task_id"
@@ -74,13 +75,33 @@ export default function InspectionPage({ user }) {
               { key: 'room', title: 'Room', render: (t) => <strong>{t.room_number}</strong> },
               { key: 'hk', title: 'Cleaned by', render: (t) => t.housekeeper?.trim() || '-' },
               { key: 'priority', title: 'Priority', render: (t) => <Badge value={t.priority} /> },
-              { key: 'progress', title: 'Progress', render: (t) => <Badge value={t.task_status}>{progressText(t.task_status, true)}</Badge> },
             ]}
           />
+          <p className="hk-footnote">Oldest first; inspections can be prioritized by arrival time.</p>
           <div className="hk-report-bar">
-            <span className="hk-footnote">Generate a report of the rooms shown above.</span>
-            <ExportMenu title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
+            <button
+              type="button"
+              className="hk-btn hk-btn--secondary hk-btn--block"
+              disabled={!rows.length}
+              onClick={() => exportPdf({ title: 'Room Inspection Report', fileName: 'inspection-report', columns: REPORT_COLUMNS, rows })}
+            >
+              Generate report
+            </button>
+            <ExportMenu label="Export · PDF / Excel" title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
           </div>
+        </Card>
+        <Card title="Recent activity" subtitle="Latest room status changes">
+          {activity.data?.activity.length === 0 && <p className="hk-muted">No activity yet.</p>}
+          <ul className="hk-list">
+            {(activity.data?.activity || []).slice(0, 8).map((a) => (
+              <li key={a.log_id}>
+                <span>
+                  Room {a.room_number}: {label(a.previous_status)} → <strong>{label(a.new_status)}</strong>
+                </span>
+                <small>{a.changed_by?.trim() || 'System'} · {formatDateTime(a.changed_at)}</small>
+              </li>
+            ))}
+          </ul>
         </Card>
         {selected && (
           <Card title="Cleaning evidence">
@@ -97,19 +118,6 @@ export default function InspectionPage({ user }) {
             {selected.notes && <p className="hk-muted">{selected.notes}</p>}
           </Card>
         )}
-        <Card title="Recent activity" subtitle="Latest room status changes">
-          {activity.data?.activity.length === 0 && <p className="hk-muted">No activity yet.</p>}
-          <ul className="hk-list">
-            {(activity.data?.activity || []).slice(0, 8).map((a) => (
-              <li key={a.log_id}>
-                <span>
-                  Room {a.room_number}: {label(a.previous_status)} → <strong>{label(a.new_status)}</strong>
-                </span>
-                <small>{a.changed_by?.trim() || 'System'} · {formatDateTime(a.changed_at)}</small>
-              </li>
-            ))}
-          </ul>
-        </Card>
       </div>
 
       {selected?.task_status === 'COMPLETED' ? (

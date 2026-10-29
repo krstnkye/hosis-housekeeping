@@ -36,6 +36,11 @@ export function todayISO() {
   return d.toISOString().slice(0, 10)
 }
 
+// "2026-10-29" -> "Thursday, October 29, 2026"
+export function longDate(iso, opts = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString([], opts)
+}
+
 export function addDays(iso, days) {
   const d = new Date(`${iso}T00:00:00`)
   d.setDate(d.getDate() + days)

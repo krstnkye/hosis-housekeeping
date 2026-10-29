@@ -59,10 +59,10 @@ export function Stat({ title, value, note, valueTone }) {
 }
 
 // Table whose rows can be selected (selected row is highlighted in gold).
-export function DataTable({ columns, rows, rowKey, selectedKey, onSelect, empty = 'No records found.' }) {
+export function DataTable({ columns, rows, rowKey, selectedKey, onSelect, empty = 'No records found.', darkHover }) {
   return (
     <div className="hk-table-wrap">
-      <table className="hk-table">
+      <table className={`hk-table${darkHover ? ' hk-table--dark-hover' : ''}`}>
         <thead>
           <tr>
             {columns.map((c) => (
