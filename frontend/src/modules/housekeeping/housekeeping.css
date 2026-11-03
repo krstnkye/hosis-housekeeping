@@ -1978,49 +1978,6 @@
   }
 }
 
-@media (max-width: 860px) {
-  .hk-app,
-  .hk-app.is-collapsed {
-    grid-template-columns: 1fr;
-    background: var(--hk-cream);
-  }
-
-  .hk-topbar {
-    flex-wrap: wrap;
-  }
-
-  .hk-topbar__date,
-  .hk-user__text {
-    display: none;
-  }
-
-  .hk-sidebar {
-    position: static;
-    height: auto;
-  }
-
-  .hk-nav {
-    flex-direction: row;
-    overflow-x: auto;
-  }
-
-  .hk-nav__item {
-    white-space: nowrap;
-  }
-
-  .hk-login__frame {
-    grid-template-columns: 1fr;
-  }
-
-  .hk-login__hero {
-    min-height: 180px;
-  }
-
-  .hk-form {
-    grid-template-columns: 1fr;
-  }
-}
-
 .hk-workload .hk-workload__count {
   font-size: 1.35rem;
   color: var(--hk-navy);
@@ -2039,4 +1996,476 @@ button.hk-login__forgot {
   margin: -8px 0 0;
   text-align: center;
   font-size: 0.82rem;
+}
+
+/* ---------- Phones and small tablets ---------- */
+
+/* The menu button and hotel mark only show on small screens. */
+.hk-topbar__start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hk-menu-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.hk-menu-btn:hover,
+.hk-menu-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.hk-topbar__mark {
+  width: 30px;
+  height: auto;
+  display: block;
+}
+
+.hk-page-head__sep {
+  display: none;
+}
+
+body.hk-no-scroll {
+  overflow: hidden;
+}
+
+@media (max-width: 860px) {
+  /* App shell: one column, the sidebar becomes a slide-in drawer. */
+  .hk-app,
+  .hk-app.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    background: var(--hk-cream);
+  }
+
+  .hk-sidebar.is-drawer {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: min(280px, 82vw);
+    height: 100dvh;
+    padding: 16px 16px 24px;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease, visibility 0.22s;
+    visibility: hidden;
+    overscroll-behavior: contain;
+  }
+
+  .hk-sidebar.is-drawer.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .hk-sidebar.is-drawer .hk-nav {
+    gap: 10px;
+  }
+
+  .hk-sidebar.is-drawer .hk-nav__item {
+    font-size: 1.02rem;
+    padding: 12px 16px;
+    min-height: 48px;
+  }
+
+  .hk-sidebar__close {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    order: -1;
+    margin: 0;
+  }
+
+  .hk-sidebar.is-drawer .hk-brand__logo {
+    width: 170px;
+  }
+
+  .hk-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(18, 13, 92, 0.5);
+  }
+
+  /* Top bar stays visible while scrolling. */
+  .hk-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .hk-topbar .hk-bell {
+    margin-right: auto;
+  }
+
+  .hk-topbar__date,
+  .hk-user__text {
+    display: none;
+  }
+
+  .hk-user {
+    gap: 8px;
+  }
+
+  .hk-user__avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Notifications open as a full-width panel under the top bar. */
+  .hk-bell {
+    position: static;
+  }
+
+  .hk-bell__panel {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100dvh - 80px);
+  }
+
+  .hk-content {
+    padding: 16px 14px 8px;
+    gap: 14px;
+  }
+
+  .hk-footer {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  /* Page title: date and page actions go under the title. */
+  .hk-page-head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hk-page-head h1 {
+    font-size: 1.45rem;
+  }
+
+  .hk-page-head__side {
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .hk-page-head__clock {
+    text-align: left;
+    order: -1;
+  }
+
+  .hk-page-head__clock br {
+    display: none;
+  }
+
+  .hk-page-head__sep {
+    display: inline;
+  }
+
+  /* Cards, toolbars and forms. */
+  .hk-card {
+    padding: 16px 14px;
+  }
+
+  .hk-card__head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .hk-card__actions .hk-actions {
+    flex-wrap: wrap;
+  }
+
+  .hk-toolbar,
+  .hk-filterbar,
+  .hk-report-bar,
+  .hk-actions {
+    flex-wrap: wrap;
+  }
+
+  .hk-toolbar > select,
+  .hk-filterbar select {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .hk-form {
+    grid-template-columns: 1fr;
+  }
+
+  .hk-field--wide {
+    grid-column: auto;
+  }
+
+  /* 16px inputs stop iPhones zooming in when a field is tapped. */
+  .hk-app input,
+  .hk-app select,
+  .hk-app textarea,
+  .hk-login input,
+  .hk-login select {
+    font-size: 16px;
+  }
+
+  .hk-btn {
+    min-height: 42px;
+  }
+
+  .hk-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-inline: -14px;
+    padding-inline: 14px;
+    scrollbar-width: none;
+  }
+
+  .hk-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hk-chip {
+    flex: 0 0 auto;
+  }
+
+  .hk-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* Tables scroll sideways inside their card instead of being cut off. */
+  .hk-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .hk-table th,
+  .hk-table td {
+    padding: 10px 10px;
+  }
+
+  /* Dashboard room status overview: bars under the labels, chart centered. */
+  .hk-overview {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .hk-overview > * {
+    width: 100%;
+  }
+
+  .hk-overview .hk-donut {
+    justify-self: center;
+    width: auto;
+  }
+
+  .hk-overview .hk-donut svg {
+    width: 180px;
+  }
+
+  .hk-bars li {
+    grid-template-columns: 24px minmax(0, 1fr) 72px 22px;
+    gap: 8px;
+  }
+
+  .hk-stats,
+  .hk-stats--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hk-coverage > div {
+    flex-wrap: wrap;
+  }
+
+  .hk-date-nav,
+  .hk-datenav {
+    flex-wrap: wrap;
+  }
+
+  .hk-datepicker__pop {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 28px);
+  }
+
+  .hk-facts {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 12px;
+  }
+
+  .hk-facts dd {
+    overflow-wrap: anywhere;
+  }
+
+  .hk-functions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Pop-ups open as sheets that use the whole screen width. */
+  .hk-modal {
+    padding: 12px 8px;
+    align-items: end;
+  }
+
+  .hk-modal__box {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+  }
+
+  .hk-modal__box .hk-actions {
+    flex-wrap: wrap;
+  }
+
+  .hk-modal__box .hk-actions .hk-btn {
+    flex: 1 1 auto;
+  }
+
+  /* Login. */
+  .hk-login__banner {
+    width: 100%;
+    padding: 10px 16px 12px;
+    border-bottom-right-radius: 0 0;
+  }
+
+  .hk-login__banner img {
+    height: auto;
+    max-height: 56px;
+    max-width: 100%;
+  }
+
+  .hk-login__frame {
+    grid-template-columns: minmax(0, 1fr);
+    width: calc(100% - 24px);
+    margin: 16px auto 24px;
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .hk-login__hero {
+    min-height: 0;
+    max-height: 200px;
+    height: 200px;
+  }
+
+  .hk-login__card {
+    padding: 22px 16px 18px;
+  }
+
+  .hk-login__card h1 {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .hk-stats,
+  .hk-stats--three {
+    gap: 10px;
+  }
+
+  .hk-btn--end {
+    padding: 6px 10px;
+  }
+}
+
+/* Wide tables become stacked cards on phones. */
+@media (max-width: 600px) {
+  .hk-table-wrap:has(.hk-table--stack) {
+    background: transparent;
+    overflow: visible;
+  }
+
+  .hk-table--stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .hk-table--stack,
+  .hk-table--stack tbody {
+    display: block;
+  }
+
+  .hk-table--stack tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hk-table--stack tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px 12px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e6e3f2;
+  }
+
+  .hk-table--stack td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .hk-table--stack td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--hk-muted);
+  }
+
+  /* First column is the row's title. */
+  .hk-table--stack td:first-child {
+    grid-column: 1 / -1;
+    font-size: 0.95rem;
+  }
+
+  .hk-table--stack td:first-child::before {
+    display: none;
+  }
+
+  .hk-table--stack td.hk-table__empty {
+    grid-column: 1 / -1;
+  }
+
+  .hk-table--stack td.hk-table__empty::before {
+    display: none;
+  }
+
+  .hk-table--stack tr.is-selected {
+    border-color: var(--hk-gold);
+    box-shadow: inset 4px 0 0 var(--hk-gold);
+  }
+
+  .hk-table--dark-hover.hk-table--stack tbody tr[tabindex]:hover td::before,
+  .hk-table--dark-hover.hk-table--stack tbody tr[tabindex]:focus-visible td::before {
+    color: inherit;
+    opacity: 0.75;
+  }
 }

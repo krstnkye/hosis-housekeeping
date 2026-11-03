@@ -11,9 +11,28 @@ import logoMark from '../assets/logo-mark.png'
 
 // Housekeeping menu from the Figma design. It can be minimized to icons only.
 // Housekeepers see "My Schedule" in place of the supervisor's Schedules page.
-export function Sidebar({ current, collapsed, onToggle, tabs = TABS }) {
+// On phones (mobile=true) it becomes a slide-in drawer opened from the top bar.
+export function Sidebar({ current, collapsed, onToggle, tabs = TABS, mobile = false, open = false, onClose }) {
+  useEffect(() => {
+    if (!mobile || !open) return
+    const esc = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', esc)
+    document.body.classList.add('hk-no-scroll')
+    return () => {
+      document.removeEventListener('keydown', esc)
+      document.body.classList.remove('hk-no-scroll')
+    }
+  }, [mobile, open, onClose])
+
   return (
-    <aside className={`hk-sidebar${collapsed ? ' is-collapsed' : ''}`}>
+    <>
+    {mobile && open && <div className="hk-drawer-backdrop" onClick={onClose} aria-hidden="true" />}
+    <aside
+      id="hk-menu"
+      className={`hk-sidebar${collapsed ? ' is-collapsed' : ''}${mobile ? ' is-drawer' : ''}${open ? ' is-open' : ''}`}
+      aria-hidden={mobile && !open ? true : undefined}
+      inert={mobile && !open ? true : undefined}
+    >
       <div className="hk-brand">
         <img
           src={collapsed ? logoMark : logoSidebar}
@@ -21,16 +40,22 @@ export function Sidebar({ current, collapsed, onToggle, tabs = TABS }) {
           className={collapsed ? 'hk-brand__mark' : 'hk-brand__logo'}
         />
       </div>
-      <button
-        type="button"
-        className="hk-sidebar__toggle"
-        onClick={onToggle}
-        aria-label={collapsed ? 'Expand menu' : 'Minimize menu'}
-        aria-expanded={!collapsed}
-        title={collapsed ? 'Expand menu' : 'Minimize menu'}
-      >
-        <Icon d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} size={16} />
-      </button>
+      {mobile ? (
+        <button type="button" className="hk-sidebar__toggle hk-sidebar__close" onClick={onClose} aria-label="Close menu" title="Close menu">
+          <Icon d="M6 6l12 12M18 6 6 18" size={16} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="hk-sidebar__toggle"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand menu' : 'Minimize menu'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand menu' : 'Minimize menu'}
+        >
+          <Icon d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} size={16} />
+        </button>
+      )}
       <nav className="hk-nav" aria-label="Housekeeping functions">
         {tabs.map((t) => {
           const active = t.id === current
@@ -42,6 +67,7 @@ export function Sidebar({ current, collapsed, onToggle, tabs = TABS }) {
               aria-current={active ? 'page' : undefined}
               aria-label={collapsed ? t.name : undefined}
               title={collapsed ? t.name : undefined}
+              onClick={mobile ? onClose : undefined}
             >
               <Icon d={t.icon} />
               {!collapsed && <span>{t.name}</span>}
@@ -50,15 +76,32 @@ export function Sidebar({ current, collapsed, onToggle, tabs = TABS }) {
         })}
       </nav>
     </aside>
+    </>
   )
 }
 
 // Top bar from the Figma design: notification bell on the left, the signed-in
 // staff member and End session on the right.
-export function Topbar({ user, onLogout }) {
+// On phones it also carries the menu button and the hotel mark.
+export function Topbar({ user, onLogout, onMenu, menuOpen = false }) {
   const [confirm, setConfirm] = useState(false)
   return (
     <header className="hk-topbar">
+      {onMenu && (
+        <div className="hk-topbar__start">
+          <button
+            type="button"
+            className="hk-menu-btn"
+            onClick={onMenu}
+            aria-label="Open menu"
+            aria-controls="hk-menu"
+            aria-expanded={menuOpen}
+          >
+            <Icon d="M4 7h16M4 12h16M4 17h16" size={22} />
+          </button>
+          <img src={logoMark} alt="Grand Horizon Hotel" className="hk-topbar__mark" />
+        </div>
+      )}
       <NotificationBell />
       <div className="hk-user">
         <span className="hk-user__avatar" aria-hidden="true">
@@ -95,6 +138,7 @@ export function PageHeader({ title, subtitle, actions }) {
         <time className="hk-page-head__clock" dateTime={now.toISOString()}>
           {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           <br />
+          <span className="hk-page-head__sep" aria-hidden="true"> · </span>
           {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
         </time>
       </div>
