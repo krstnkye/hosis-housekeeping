@@ -3,7 +3,8 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
 const { requirePosition } = require('../../middleware/auth');
-const { changeRoomStatus } = require('./roomStatus');
+const { changeRoomStatus, assertNotOutOfOrder } = require('./roomStatus');
+const { assertHousekeepingStaff } = require('./staff');
 
 const router = express.Router();
 
@@ -27,17 +28,6 @@ async function getTask(client, taskId, lock = false) {
     throw new HttpError(404, 'Cleaning task not found.');
   }
   return rows[0];
-}
-
-async function getHousekeeper(client, staffId) {
-  const { rows } = await client.query(
-    `SELECT user_id FROM users
-      WHERE user_id = $1 AND role = 'HOUSEKEEPING' AND employment_status = 'ACTIVE'`,
-    [staffId]
-  );
-  if (!rows[0]) {
-    throw new HttpError(400, 'Assigned staff must be an active housekeeping employee.');
-  }
 }
 
 // HK-004 (view): today's cleaning queue. ?mine=1 shows only the user's tasks.
@@ -118,7 +108,7 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
       throw new HttpError(409, `This room already has an open cleaning task (#${active[0].task_id}).`);
     }
     if (staffId) {
-      await getHousekeeper(client, staffId);
+      await assertHousekeepingStaff(client, staffId);
     }
     const { rows } = await client.query(
       `INSERT INTO hk_cleaning_tasks (room_id, staff_id, task_type, priority, task_status, notes, due_time)
@@ -147,7 +137,7 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
     if (body.staffId !== undefined) {
       staffId = v.optionalId(body.staffId, 'housekeeper');
       if (staffId) {
-        await getHousekeeper(client, staffId);
+        await assertHousekeepingStaff(client, staffId);
       }
     }
     let status = current.task_status;
@@ -183,6 +173,7 @@ router.post('/:id/start', async (req, res) => {
     if (!['ASSIGNED', 'RETURNED'].includes(current.task_status)) {
       throw new HttpError(409, `A ${current.task_status} task cannot be started. Assign a housekeeper first.`);
     }
+    await assertNotOutOfOrder(client, current.room_id);
     const { rows } = await client.query(
       `UPDATE hk_cleaning_tasks SET task_status = 'IN_PROGRESS', start_time = NOW(), completion_time = NULL
         WHERE task_id = $1 RETURNING *`,
@@ -204,6 +195,8 @@ router.post('/:id/complete', async (req, res) => {
     if (current.task_status !== 'IN_PROGRESS') {
       throw new HttpError(409, 'Only a task that is in progress can be marked complete.');
     }
+    // A room set OUT OF ORDER while it was being cleaned must not become CLEAN.
+    await assertNotOutOfOrder(client, current.room_id);
     const { rows } = await client.query(
       `UPDATE hk_cleaning_tasks SET task_status = 'COMPLETED', completion_time = NOW()
         WHERE task_id = $1 RETURNING *`,

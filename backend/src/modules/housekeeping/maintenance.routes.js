@@ -2,11 +2,18 @@ const express = require('express');
 const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
-const { changeRoomStatus } = require('./roomStatus');
+const { changeRoomStatus, lockRoom } = require('./roomStatus');
 
+// Housekeeping side of maintenance (HK-015). Engineering's side
+// (viewing incoming requests and updating repair progress) is in
+// engineering.routes.js, so only Engineering can mark a repair REPAIRED.
 const router = express.Router();
 
 const CATEGORIES = ['PLUMBING', 'ELECTRICAL', 'AIRCON', 'FURNITURE', 'APPLIANCE', 'OTHER'];
+
+// Front Office owns rooms that are sold or in use. Housekeeping can still
+// report a problem in them, but cannot take them off sale by itself.
+const FRONT_OFFICE_HELD = ['OCCUPIED', 'RESERVED'];
 
 const SELECT = `
   SELECT m.*, r.room_number, r.room_status,
@@ -15,14 +22,12 @@ const SELECT = `
     JOIN rooms r ON r.room_id = m.room_id
     JOIN users u ON u.user_id = m.reported_by`;
 
+const PRIORITY_ORDER = `CASE m.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END`;
+
 // Open issues by default, ?view=all for history.
 router.get('/', async (req, res) => {
   const where = req.query.view === 'all' ? '' : `WHERE m.status <> 'CLOSED'`;
-  const { rows } = await db.query(
-    `${SELECT} ${where}
-      ORDER BY CASE m.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
-               m.reported_at DESC`
-  );
+  const { rows } = await db.query(`${SELECT} ${where} ORDER BY ${PRIORITY_ORDER}, m.reported_at DESC`);
   res.json({ requests: rows });
 });
 
@@ -37,6 +42,13 @@ router.post('/', async (req, res) => {
   const setOutOfOrder = body.setOutOfOrder === true;
 
   const request = await db.withTransaction(async (client) => {
+    const room = await lockRoom(client, roomId);
+    if (setOutOfOrder && FRONT_OFFICE_HELD.includes(room.room_status)) {
+      throw new HttpError(
+        409,
+        `Room ${room.room_number} is ${room.room_status}. Report the issue without setting it OUT OF ORDER, and ask Front Office to move the guest first.`
+      );
+    }
     const { rows } = await client.query(
       `INSERT INTO hk_maintenance_requests
          (room_id, reported_by, issue_category, issue_description, priority, room_set_ooo)
@@ -57,20 +69,21 @@ router.post('/', async (req, res) => {
   res.status(201).json({ request });
 });
 
-// Track Engineering's progress (IN_PROGRESS, then REPAIRED when the repair is done).
+// Housekeeping may correct the priority or description of an open request.
+// The repair status belongs to Engineering (see engineering.routes.js).
 router.patch('/:id', async (req, res) => {
   const requestId = v.id(req.params.id, 'request id');
   const body = req.body;
-  v.oneOf(body.status, ['REPORTED', 'IN_PROGRESS', 'REPAIRED'], 'status');
+  if (body.status !== undefined) {
+    throw new HttpError(403, 'Only Engineering can update the repair status.');
+  }
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
   const { rows } = await db.query(
     `UPDATE hk_maintenance_requests
-        SET status = COALESCE($1, status),
-            priority = COALESCE($2, priority),
-            issue_description = COALESCE($3, issue_description),
-            resolved_at = CASE WHEN $1 = 'REPAIRED' THEN NOW() WHEN $1 IS NULL THEN resolved_at ELSE NULL END
-      WHERE request_id = $4 AND status <> 'CLOSED' RETURNING *`,
-    [body.status || null, body.priority || null, body.description || null, requestId]
+        SET priority = COALESCE($1, priority),
+            issue_description = COALESCE($2, issue_description)
+      WHERE request_id = $3 AND status <> 'CLOSED' RETURNING *`,
+    [body.priority || null, body.description || null, requestId]
   );
   if (!rows[0]) {
     throw new HttpError(409, 'Request not found or already closed.');
@@ -78,8 +91,10 @@ router.patch('/:id', async (req, res) => {
   res.json({ request: rows[0] });
 });
 
-// After Engineering completes the repair: room goes OUT_OF_ORDER -> DIRTY and
-// a post-repair cleaning task is created, then the request is closed.
+// After Engineering marks the repair REPAIRED, Housekeeping releases the room:
+// OUT_OF_ORDER -> DIRTY, the request is closed, and the room gets a
+// high-priority cleaning task. A cleaning task that was still open when the
+// room went out of order is reopened instead of creating a second one.
 router.post('/:id/release', async (req, res) => {
   const requestId = v.id(req.params.id, 'request id');
   const result = await db.withTransaction(async (client) => {
@@ -94,10 +109,8 @@ router.post('/:id/release', async (req, res) => {
     if (request.status !== 'REPAIRED') {
       throw new HttpError(409, 'Engineering must mark the repair as REPAIRED before the room is released.');
     }
-    await client.query(
-      `UPDATE hk_maintenance_requests SET status = 'CLOSED' WHERE request_id = $1`,
-      [requestId]
-    );
+    await client.query(`UPDATE hk_maintenance_requests SET status = 'CLOSED' WHERE request_id = $1`, [requestId]);
+    const closed = { ...request, status: 'CLOSED' };
 
     // Another open request may still be keeping the room out of order.
     const { rows: others } = await client.query(
@@ -105,9 +118,9 @@ router.post('/:id/release', async (req, res) => {
         WHERE room_id = $1 AND room_set_ooo AND status <> 'CLOSED'`,
       [request.room_id]
     );
-    const { rows: room } = await client.query('SELECT room_status FROM rooms WHERE room_id = $1', [request.room_id]);
-    if (others.length || room[0].room_status !== 'OUT_OF_ORDER') {
-      return { request: { ...request, status: 'CLOSED' }, task: null };
+    const room = await lockRoom(client, request.room_id);
+    if (others.length || room.room_status !== 'OUT_OF_ORDER') {
+      return { request: closed, task: null };
     }
 
     await changeRoomStatus(client, {
@@ -116,13 +129,33 @@ router.post('/:id/release', async (req, res) => {
       staffId: req.user.userId,
       remarks: `Repair completed (maintenance request #${requestId})`,
       manual: false,
+      releaseOutOfOrder: true,
     });
+
+    const note = `Clean after repair: ${request.issue_description}`.slice(0, 255);
+    const { rows: open } = await client.query(
+      `SELECT * FROM hk_cleaning_tasks
+        WHERE room_id = $1 AND task_status IN ('PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'RETURNED')
+        ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [request.room_id]
+    );
+    if (open[0]) {
+      const { rows: task } = await client.query(
+        `UPDATE hk_cleaning_tasks
+            SET task_status = CASE WHEN staff_id IS NULL THEN 'PENDING' ELSE 'ASSIGNED' END,
+                priority = CASE WHEN priority = 'URGENT' THEN 'URGENT' ELSE 'HIGH' END,
+                start_time = NULL, completion_time = NULL, notes = $2
+          WHERE task_id = $1 RETURNING *`,
+        [open[0].task_id, note]
+      );
+      return { request: closed, task: task[0], reopened: true };
+    }
     const { rows: task } = await client.query(
       `INSERT INTO hk_cleaning_tasks (room_id, task_type, priority, notes)
        VALUES ($1, 'POST_REPAIR', 'HIGH', $2) RETURNING *`,
-      [request.room_id, `Clean after repair: ${request.issue_description}`]
+      [request.room_id, note]
     );
-    return { request: { ...request, status: 'CLOSED' }, task: task[0] };
+    return { request: closed, task: task[0], reopened: false };
   });
   res.json(result);
 });

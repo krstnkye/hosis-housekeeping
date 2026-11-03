@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
+const { assertHousekeepingStaff } = require('./staff');
 
 const router = express.Router();
 
@@ -47,6 +48,9 @@ router.post('/', async (req, res) => {
   v.oneOf(body.requestType, REQUEST_TYPES, 'requestType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
   const staffId = v.optionalId(body.staffId, 'staff');
+  if (staffId) {
+    await assertHousekeepingStaff(db, staffId, 'Guest requests can only be assigned to active housekeeping staff.');
+  }
   const { rows } = await db.query(
     `INSERT INTO hk_guest_requests (guest_id, room_id, staff_id, request_type, priority, request_details, request_status)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -71,6 +75,9 @@ router.patch('/:id', async (req, res) => {
     throw new HttpError(409, 'This request is already completed.');
   }
   const staffId = body.staffId !== undefined ? v.optionalId(body.staffId, 'staff') : current.staff_id;
+  if (staffId && staffId !== current.staff_id) {
+    await assertHousekeepingStaff(db, staffId, 'Guest requests can only be assigned to active housekeeping staff.');
+  }
   const { rows } = await db.query(
     `UPDATE hk_guest_requests
         SET staff_id = $1, request_type = $2, priority = $3, request_details = $4, request_status = $5

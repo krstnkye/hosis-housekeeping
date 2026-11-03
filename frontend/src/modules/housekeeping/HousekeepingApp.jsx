@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { clearSession, getSession, setUnauthorizedHandler } from './api.js'
+import { clearSession, getSession, setExternalSession, setUnauthorizedHandler } from './api.js'
 import { PageHeader, Sidebar, Topbar } from './components/Layout.jsx'
 import { TABS } from './tabs.js'
 import LoginPage from './pages/LoginPage.jsx'
@@ -31,8 +31,15 @@ function currentTab() {
   return TABS.some((t) => t.id === id) ? id : 'overview'
 }
 
-export default function HousekeepingApp() {
-  const [session, setSession] = useState(getSession)
+const ALLOWED_ROLES = ['HOUSEKEEPING', 'ADMIN']
+
+// Standalone: <HousekeepingApp /> shows its own login page.
+// Inside the combined HOSIS app: <HousekeepingApp session={{ token, user }} onLogout={...} />
+// uses the app shell's login instead. `user` must carry userId, name, role and position.
+export default function HousekeepingApp({ session: shellSession = null, onLogout: shellLogout = null }) {
+  setExternalSession(shellSession)
+  const [ownSession, setSession] = useState(() => (shellSession ? null : getSession()))
+  const session = shellSession || ownSession
   const [tab, setTab] = useState(currentTab)
   // Pages can place buttons in the page header (e.g. Export) through a portal.
   const [headerActions, setHeaderActions] = useState(null)
@@ -52,13 +59,27 @@ export default function HousekeepingApp() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      if (shellLogout) {
+        shellLogout()
+        return
+      }
       clearSession()
       setSession(null)
     })
-  }, [])
+  }, [shellLogout])
 
   if (!session) {
     return <LoginPage onLogin={setSession} />
+  }
+
+  if (!ALLOWED_ROLES.includes(session.user.role)) {
+    return (
+      <div className="hk-app">
+        <main className="hk-content">
+          <PageHeader title="Access denied" subtitle="This account is not authorized for the Housekeeping module." actions={null} />
+        </main>
+      </div>
+    )
   }
 
   // Housekeepers get their own schedule page (Figma "My Schedule - HK staff").
@@ -86,6 +107,10 @@ export default function HousekeepingApp() {
         <Topbar
           user={session.user}
           onLogout={() => {
+            if (shellLogout) {
+              shellLogout()
+              return
+            }
             clearSession()
             setSession(null)
           }}

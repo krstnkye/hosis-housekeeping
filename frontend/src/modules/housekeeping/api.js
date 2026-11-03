@@ -7,7 +7,15 @@ function storage() {
   return localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage
 }
 
+// When Housekeeping runs inside the combined HOSIS app, the app shell owns the
+// login and passes its session in (see HousekeepingApp's `session` prop).
+let externalSession = null
+export function setExternalSession(session) {
+  externalSession = session && session.token && session.user ? session : null
+}
+
 export function getSession() {
+  if (externalSession) return externalSession
   const store = storage()
   const token = store.getItem(TOKEN_KEY)
   const user = store.getItem(USER_KEY)

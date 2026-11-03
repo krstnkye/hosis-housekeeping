@@ -191,7 +191,6 @@ function ReportForm({ rooms, issues, onSaved }) {
 }
 
 function IssueTracker({ issue, onSaved }) {
-  const [status, setStatus] = useState(issue.status)
   const [checks, setChecks] = useState(RELEASE_CHECKS.map(() => false))
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -223,29 +222,12 @@ function IssueTracker({ issue, onSaved }) {
           {issue.room_set_ooo && <li><span>Room set OUT OF ORDER</span><small>{formatDateTime(issue.reported_at)}</small></li>}
           {issue.resolved_at && <li><span>Engineering completed the repair</span><small>{formatDateTime(issue.resolved_at)}</small></li>}
         </ul>
-        <Field label="Repair status (from Engineering)" wide>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="REPORTED">Reported</option>
-            <option value="IN_PROGRESS">In progress</option>
-            <option value="REPAIRED">Repaired</option>
-          </select>
-        </Field>
+        <Notice tone={repaired ? 'green' : 'amber'} title={`Repair status: ${label(issue.status)}`}>
+          {repaired
+            ? 'Engineering marked the repair as finished. Complete the checks below to release the room.'
+            : 'Engineering updates the repair status from their side. This page refreshes it when you reload the list.'}
+        </Notice>
         {error && <Notice tone="red" title="Not saved">{error}</Notice>}
-        <div className="hk-actions">
-          <button
-            type="button"
-            className="hk-btn hk-btn--secondary"
-            disabled={busy || status === issue.status}
-            onClick={() =>
-              run(async () => {
-                await api.updateIssue(issue.request_id, { status })
-                return { tone: 'green', title: `Repair status set to ${label(status)}.` }
-              })
-            }
-          >
-            Update repair status
-          </button>
-        </div>
       </Card>
 
       <Card title="After repair · safe-to-release conditions">
@@ -275,9 +257,10 @@ function IssueTracker({ issue, onSaved }) {
             onClick={() =>
               run(async () => {
                 const res = await api.releaseRoom(issue.request_id)
-                return res.task
-                  ? { tone: 'green', title: `Room ${issue.room_number} is now DIRTY`, text: `Post-repair cleaning task #${res.task.task_id} was created. Assign it on the Cleaning Tasks page.` }
-                  : { tone: 'green', title: 'Issue closed.' }
+                if (!res.task) return { tone: 'green', title: 'Issue closed.' }
+                return res.reopened
+                  ? { tone: 'green', title: `Room ${issue.room_number} is now DIRTY`, text: `Cleaning task #${res.task.task_id} was reopened with high priority.` }
+                  : { tone: 'green', title: `Room ${issue.room_number} is now DIRTY`, text: `Post-repair cleaning task #${res.task.task_id} was created. Assign it on the Cleaning Tasks page.` }
               })
             }
           >

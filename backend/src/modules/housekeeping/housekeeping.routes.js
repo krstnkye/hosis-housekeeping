@@ -4,19 +4,15 @@ const { authenticate, authorize } = require('../../middleware/auth');
 
 const router = express.Router();
 
-// All Housekeeping endpoints need a logged-in HOUSEKEEPING (or ADMIN) user.
+// All Housekeeping endpoints need a logged-in user.
 router.use(authenticate);
 
-// Front Office reads the "room ready" notifications that Housekeeping raises.
-router.get('/notifications', authorize('HOUSEKEEPING', 'FRONT_OFFICE'), async (req, res) => {
-  const { rows } = await db.query(
-    `SELECT n.*, r.room_number FROM hk_front_office_notifications n
-       JOIN rooms r ON r.room_id = n.room_id
-      ORDER BY n.created_at DESC LIMIT 20`
-  );
-  res.json({ notifications: rows });
-});
+// Integration endpoints for other HOSIS departments. Each route checks its own
+// role, so these are mounted before the HOUSEKEEPING-only gate below.
+router.use(require('./frontOffice.routes'));
+router.use('/maintenance', require('./engineering.routes'));
 
+// Everything else is for HOUSEKEEPING (or ADMIN) users only.
 router.use(authorize('HOUSEKEEPING'));
 
 // Housekeeping Dashboard: counts shown on the Overview page.
@@ -93,7 +89,8 @@ router.get('/staff', async (req, res) => {
   res.json({ staff: rows });
 });
 
-// HK-011 (FR): limited guest info needed for housekeeping work only.
+// Limited guest info needed for housekeeping work only
+// (class HOSIS HK-011; see docs/housekeeping/REQUIREMENTS-MAPPING.md).
 router.get('/guests', async (req, res) => {
   const { rows } = await db.query(
     `SELECT guest_id, CONCAT(first_name, ' ', last_name) AS name FROM guests ORDER BY name`

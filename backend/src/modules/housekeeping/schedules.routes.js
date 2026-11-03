@@ -29,7 +29,7 @@ function checkSchedule(body) {
 // HK-008: view the staff schedule for a day (defaults to today),
 // with each person's cleaning task count for that day.
 router.get('/', async (req, res) => {
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
+  const date = req.query.date || db.today();
   if (!DATE_RE.test(date)) {
     throw new HttpError(400, 'date must be in YYYY-MM-DD format.');
   }
@@ -70,7 +70,7 @@ router.get('/mine', async (req, res) => {
 
 // Days in a month that have at least one shift (dots on the calendar picker).
 router.get('/days', async (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  const month = req.query.month || db.today().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month)) {
     throw new HttpError(400, 'month must be in YYYY-MM format.');
   }

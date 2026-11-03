@@ -3,10 +3,12 @@ const cors = require('cors');
 const authRoutes = require('./modules/auth/auth.routes');
 const housekeepingRoutes = require('./modules/housekeeping');
 const errorHandler = require('./middleware/errorHandler');
+const { corsOrigins } = require('./config/env');
 
 const app = express();
 
-app.use(cors());
+// Only the HOSIS frontend may call the API from a browser (set CORS_ORIGIN).
+app.use(cors({ origin: corsOrigins() }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
