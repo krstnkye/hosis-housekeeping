@@ -15,7 +15,8 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 ## Documentation
 
 The current Housekeeping-only project document is
-[`documentation/Housekeeping_Subsystem_Documentation_Updated_2026.docx`](documentation/Housekeeping_Subsystem_Documentation_Updated_2026.docx).
+[`documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx`](documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx).
+Older versions stay in the same folder for reference.
 It keeps the professor's required format and covers the implemented ERD, DFD,
 flowchart, UI screens, database dictionary, tests, and user manual.
 
