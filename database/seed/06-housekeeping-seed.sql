@@ -1,24 +1,38 @@
 -- =====================================================================
--- HOSIS - Housekeeping sample data (for development and demo only)
+-- HOSIS - Housekeeping sample data (for development, demo and tests ONLY)
+--
+-- WARNING: this file first EMPTIES every hk_ table, then reloads the demo
+-- data, so it can be run again at any time to reset the demo. Never run it
+-- on a database that holds real hotel records. The automated tests run it
+-- before every test run.
 --
 -- All accounts use the password: password123
 -- Staff can sign in with their email or username.
 --   hk.supervisor  Housekeeping supervisor (can assign tasks and schedules),
---                  email TabudloHK@gmail.com
+--                  email maria.santos@grandhorizon.ph
 --   hk.inspector   Housekeeping inspector  (can inspect rooms)
 --   hk.liza / hk.joy / hk.mark  Housekeepers
---   fo.desk        Front Office account, used to show "Access denied"
+--   fo.desk        Front Office account (denied at the Housekeeping login;
+--                  used to test the Front Office integration endpoints)
+--   eng.tech       Engineering account (used to test the Engineering
+--                  maintenance endpoints)
 -- Dates are relative to CURRENT_DATE so the demo always looks current.
 -- =====================================================================
 
+TRUNCATE hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
+         hk_lost_found_items, hk_guest_requests, hk_schedules, hk_inspections,
+         hk_cleaning_tasks, hk_room_status_logs
+RESTART IDENTITY;
+
 INSERT INTO users (first_name, last_name, username, email, password_hash, role, position) VALUES
-    ('Maria', 'Santos',    'hk.supervisor', 'TabudloHK@gmail.com', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'SUPERVISOR'),
+    ('Maria', 'Santos',    'hk.supervisor', 'maria.santos@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'SUPERVISOR'),
     ('Ana',   'Reyes',     'hk.inspector',  'ana.reyes@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'INSPECTOR'),
     ('Liza',  'Cruz',      'hk.liza',       'liza.cruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL)
-ON CONFLICT (username) DO NOTHING;
+    ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL),
+    ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'ENGINEERING', 'TECHNICIAN')
+ON CONFLICT (username) DO UPDATE SET email = EXCLUDED.email, employment_status = 'ACTIVE';
 
 INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES
     ('101', 'Standard', 1, 'AVAILABLE'),
@@ -33,12 +47,18 @@ INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES
     ('301', 'Suite',    3, 'OCCUPIED'),
     ('302', 'Suite',    3, 'OUT_OF_ORDER'),
     ('303', 'Suite',    3, 'RESERVED')
-ON CONFLICT (room_number) DO NOTHING;
+ON CONFLICT (room_number) DO UPDATE SET room_status = EXCLUDED.room_status, updated_at = NOW();
 
-INSERT INTO guests (first_name, last_name, contact_number) VALUES
+INSERT INTO guests (first_name, last_name, contact_number)
+SELECT g.first_name, g.last_name, g.contact_number
+FROM (VALUES
     ('Carlos', 'Mendoza', '0917-555-0101'),
     ('Grace',  'Lim',     '0918-555-0202'),
-    ('Ramon',  'Bautista','0919-555-0303');
+    ('Ramon',  'Bautista','0919-555-0303')
+) AS g(first_name, last_name, contact_number)
+WHERE NOT EXISTS (
+    SELECT 1 FROM guests x WHERE x.first_name = g.first_name AND x.last_name = g.last_name
+);
 
 -- Cleaning tasks in different stages of the flowchart.
 INSERT INTO hk_cleaning_tasks (room_id, staff_id, task_type, priority, task_status, notes, due_time, start_time, completion_time)
@@ -76,7 +96,7 @@ FROM (VALUES
     ('Grace',  '202', NULL,     'AMENITIES', 'NORMAL', 'Toothbrush kit and slippers',      'OPEN'),
     ('Ramon',  '301', NULL,     'EXTRA_BED', 'HIGH',   'Rollaway bed for a child tonight', 'OPEN')
 ) AS q(guest_name, room_number, username, request_type, priority, details, status)
-JOIN guests g ON g.first_name = q.guest_name
+JOIN (SELECT DISTINCT ON (first_name) guest_id, first_name FROM guests ORDER BY first_name, guest_id) g ON g.first_name = q.guest_name
 JOIN rooms r ON r.room_number = q.room_number
 LEFT JOIN users u ON u.username = q.username;
 

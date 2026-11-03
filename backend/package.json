@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "engineering": "node scripts/engineering-update.js"
   },
   "keywords": [],
   "author": "",

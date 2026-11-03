@@ -71,17 +71,17 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-// HK-003: update room status (logged, and Front Office is notified on INSPECTED).
+// HK-003: update room status by hand (logged). INSPECTED and OUT_OF_ORDER have
+// their own workflows, so they are refused here.
 router.patch('/:id/status', async (req, res) => {
   const roomId = v.id(req.params.id, 'room id');
   v.required(req.body, ['status']);
   v.oneOf(req.body.status, ROOM_STATUSES, 'status');
-  if (
-    req.body.status === 'INSPECTED' &&
-    !['INSPECTOR', 'SUPERVISOR'].includes(req.user.position) &&
-    req.user.role !== 'ADMIN'
-  ) {
-    throw new HttpError(403, 'Only inspectors or supervisors can mark a room INSPECTED.');
+  if (req.body.status === 'INSPECTED') {
+    throw new HttpError(409, 'A room becomes INSPECTED only by passing an inspection on the Inspection page.');
+  }
+  if (req.body.status === 'OUT_OF_ORDER') {
+    throw new HttpError(409, 'Report the problem on the Maintenance page to set a room OUT OF ORDER.');
   }
   const room = await db.withTransaction((client) =>
     changeRoomStatus(client, {

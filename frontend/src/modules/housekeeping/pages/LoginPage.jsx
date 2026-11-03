@@ -69,7 +69,7 @@ export default function LoginPage({ onLogin }) {
               value={form.username}
               onChange={set('username')}
               autoComplete="username"
-              placeholder="TabudloHK@gmail.com"
+              placeholder="name@grandhorizon.ph"
               aria-invalid={missing.username || undefined}
               aria-describedby={missing.username ? 'login-email-error' : undefined}
             />

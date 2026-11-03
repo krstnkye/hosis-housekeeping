@@ -1,19 +1,26 @@
 // Integration tests for the Housekeeping API.
-// They need a PostgreSQL database loaded with database/schema/06-housekeeping.sql
-// and database/seed/06-housekeeping-seed.sql. Set DATABASE_URL before running:
+// They need a PostgreSQL database with the shared tables and
+// database/schema/06-housekeeping.sql loaded. Before the tests run, they
+// reload database/seed/06-housekeeping-seed.sql, which RESETS all hk_ data,
+// so point DATABASE_URL at a development or test database only:
 //   DATABASE_URL=postgres://... npm test
 require('dotenv').config();
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-automated-tests';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const app = require('../src/app');
 const db = require('../src/config/db');
+const { assertConfig } = require('../src/config/env');
 
 let server;
 let base;
 
 before(async () => {
+  const seed = fs.readFileSync(path.join(__dirname, '../../database/seed/06-housekeeping-seed.sql'), 'utf8');
+  await db.query(seed);
   server = app.listen(0);
   base = `http://localhost:${server.address().port}/api`;
 });
@@ -40,6 +47,12 @@ async function login(username) {
   const res = await api('POST', '/auth/login', {
     body: { username, password: 'password123', department: 'HOUSEKEEPING' },
   });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  return res.body;
+}
+
+async function loginAs(username, department) {
+  const res = await api('POST', '/auth/login', { body: { username, password: 'password123', department } });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   return res.body;
 }
@@ -151,6 +164,17 @@ test('room status: only allowed manual changes', async () => {
   });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.room.room_status, 'DIRTY');
+
+  // INSPECTED comes only from an inspection, OUT_OF_ORDER only from a maintenance request.
+  const sup = await login('hk.supervisor');
+  const clean = await roomId('205');
+  for (const status of ['INSPECTED', 'OUT_OF_ORDER']) {
+    const refused = await api('PATCH', `/housekeeping/rooms/${clean}/status`, { token: sup.token, body: { status } });
+    assert.equal(refused.status, 409, status);
+  }
+  assert.equal(await roomStatus(clean), 'CLEAN');
+  const detail = await api('GET', `/housekeeping/rooms/${clean}`, { token: sup.token });
+  assert.deepEqual(detail.body.allowedStatuses, ['DIRTY']);
 });
 
 test('lost and found: invalid claim is rejected, valid claim releases', async () => {
@@ -224,7 +248,9 @@ test('maintenance: report sets OUT OF ORDER, release creates cleaning task', asy
   const early = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: mark.token });
   assert.equal(early.status, 409);
 
-  await api('PATCH', `/housekeeping/maintenance/${id}`, { token: mark.token, body: { status: 'REPAIRED' } });
+  const eng = await loginAs('eng.tech', 'ENGINEERING');
+  const repaired = await api('PATCH', `/housekeeping/maintenance/${id}/status`, { token: eng.token, body: { status: 'REPAIRED' } });
+  assert.equal(repaired.status, 200);
   const released = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: mark.token });
   assert.equal(released.status, 200);
   assert.equal(released.body.task.task_type, 'POST_REPAIR');
@@ -251,7 +277,7 @@ test('schedules: supervisor creates, invalid times rejected', async () => {
 
 test('login with email, alerts, activity and my schedule', async () => {
   const byEmail = await api('POST', '/auth/login', {
-    body: { username: 'tabudlohk@gmail.com', password: 'password123', department: 'HOUSEKEEPING' },
+    body: { username: 'Maria.Santos@grandhorizon.ph', password: 'password123', department: 'HOUSEKEEPING' },
   });
   assert.equal(byEmail.status, 200);
   assert.equal(byEmail.body.user.username, 'hk.supervisor');
@@ -271,4 +297,142 @@ test('login with email, alerts, activity and my schedule', async () => {
 
   const all = await api('GET', '/housekeeping/guest-requests?view=all', { token: joy.token });
   assert.ok(all.body.requests.some((r) => r.request_status === 'COMPLETED'));
+});
+
+test('out of order: open cleaning cannot finish, release reopens the task', async () => {
+  const joy = await login('hk.joy');
+  const mark = await login('hk.mark');
+  const sup = await login('hk.supervisor');
+  const room = await roomId('103');
+  const { rows } = await db.query(`SELECT task_id FROM hk_cleaning_tasks WHERE room_id = $1`, [room]);
+  const taskId = rows[0].task_id;
+
+  assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: joy.token })).status, 200);
+  const report = await api('POST', '/housekeeping/maintenance', {
+    token: mark.token,
+    body: { roomId: room, category: 'PLUMBING', description: 'Toilet leaking', setOutOfOrder: true },
+  });
+  assert.equal(report.status, 201);
+
+  // Finishing the old task must not turn the broken room CLEAN.
+  const complete = await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: joy.token });
+  assert.equal(complete.status, 409);
+  assert.equal(await roomStatus(room), 'OUT_OF_ORDER');
+  // And no new task can be created for it.
+  const create = await api('POST', '/housekeeping/tasks', { token: sup.token, body: { roomId: room, taskType: 'TOUCH_UP' } });
+  assert.equal(create.status, 409);
+
+  const eng = await loginAs('eng.tech', 'ENGINEERING');
+  await api('PATCH', `/housekeeping/maintenance/${report.body.request.request_id}/status`, {
+    token: eng.token,
+    body: { status: 'REPAIRED' },
+  });
+  const released = await api('POST', `/housekeeping/maintenance/${report.body.request.request_id}/release`, { token: mark.token });
+  assert.equal(released.status, 200);
+  assert.equal(released.body.reopened, true);
+  assert.equal(released.body.task.task_id, taskId);
+  assert.equal(released.body.task.task_status, 'ASSIGNED');
+  assert.equal(released.body.task.priority, 'HIGH');
+  assert.equal(await roomStatus(room), 'DIRTY');
+  const { rows: open } = await db.query(
+    `SELECT COUNT(*)::int AS n FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`,
+    [room]
+  );
+  assert.equal(open[0].n, 1);
+});
+
+test('maintenance: occupied rooms are not set out of order', async () => {
+  const liza = await login('hk.liza');
+  const occupied = await roomId('301');
+  const refused = await api('POST', '/housekeeping/maintenance', {
+    token: liza.token,
+    body: { roomId: occupied, category: 'AIRCON', description: 'Noisy', setOutOfOrder: true },
+  });
+  assert.equal(refused.status, 409);
+  assert.equal(await roomStatus(occupied), 'OCCUPIED');
+  const reportOnly = await api('POST', '/housekeeping/maintenance', {
+    token: liza.token,
+    body: { roomId: occupied, category: 'AIRCON', description: 'Noisy' },
+  });
+  assert.equal(reportOnly.status, 201);
+});
+
+test('engineering: only Engineering updates repair status', async () => {
+  const liza = await login('hk.liza');
+  const eng = await loginAs('eng.tech', 'ENGINEERING');
+  const report = await api('POST', '/housekeeping/maintenance', {
+    token: liza.token,
+    body: { roomId: await roomId('204'), category: 'ELECTRICAL', description: 'Lamp flickers', priority: 'LOW' },
+  });
+  const id = report.body.request.request_id;
+
+  assert.equal((await api('PATCH', `/housekeeping/maintenance/${id}`, { token: liza.token, body: { status: 'REPAIRED' } })).status, 403);
+  assert.equal((await api('PATCH', `/housekeeping/maintenance/${id}/status`, { token: liza.token, body: { status: 'REPAIRED' } })).status, 403);
+  assert.equal((await api('GET', '/housekeeping/maintenance/incoming', { token: liza.token })).status, 403);
+  // Engineering cannot reach the rest of Housekeeping.
+  assert.equal((await api('GET', '/housekeeping/tasks', { token: eng.token })).status, 403);
+
+  const incoming = await api('GET', '/housekeeping/maintenance/incoming', { token: eng.token });
+  assert.equal(incoming.status, 200);
+  assert.ok(incoming.body.requests.some((r) => r.request_id === id));
+  const progress = await api('PATCH', `/housekeeping/maintenance/${id}/status`, { token: eng.token, body: { status: 'IN_PROGRESS' } });
+  assert.equal(progress.body.request.status, 'IN_PROGRESS');
+  const done = await api('PATCH', `/housekeeping/maintenance/${id}/status`, { token: eng.token, body: { status: 'REPAIRED' } });
+  assert.equal(done.body.request.status, 'REPAIRED');
+  assert.ok(done.body.request.resolved_at);
+
+  // Housekeeping can still correct the priority.
+  const edited = await api('PATCH', `/housekeeping/maintenance/${id}`, { token: liza.token, body: { priority: 'HIGH' } });
+  assert.equal(edited.body.request.priority, 'HIGH');
+});
+
+test('guest request: only housekeeping staff can be assigned', async () => {
+  const joy = await login('hk.joy');
+  const { rows } = await db.query(`SELECT user_id FROM users WHERE username = 'fo.desk'`);
+  const created = await api('POST', '/housekeeping/guest-requests', {
+    token: joy.token,
+    body: { roomId: await roomId('202'), requestType: 'TOWELS', details: 'Towels', staffId: rows[0].user_id },
+  });
+  assert.equal(created.status, 400);
+});
+
+test('front office: checkout creates a task, notifications can be marked read', async () => {
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  const token = fo.body.token;
+  const sup = await login('hk.supervisor');
+
+  const room = await roomId('102');
+  const checkout = await api('POST', '/housekeeping/checkout', { token, body: { roomId: room } });
+  assert.equal(checkout.status, 201);
+  assert.equal(checkout.body.task.task_type, 'CHECKOUT');
+  assert.equal(await roomStatus(room), 'DIRTY');
+  assert.equal((await api('POST', '/housekeeping/checkout', { token, body: { roomId: room } })).status, 409);
+  assert.equal((await api('POST', '/housekeeping/checkout', { token: sup.token, body: { roomId: room } })).status, 403);
+
+  const unread = await api('GET', '/housekeeping/notifications?unread=1', { token });
+  assert.equal(unread.status, 200);
+  assert.ok(unread.body.notifications.length > 0);
+  const id = unread.body.notifications[0].notification_id;
+  assert.equal((await api('PATCH', `/housekeeping/notifications/${id}/read`, { token: sup.token })).status, 403);
+  const read = await api('PATCH', `/housekeeping/notifications/${id}/read`, { token });
+  assert.equal(read.status, 200);
+  assert.ok(read.body.notification.read_at);
+  const after = await api('GET', '/housekeeping/notifications?unread=1', { token });
+  assert.equal(after.body.notifications.some((n) => n.notification_id === id), false);
+});
+
+test('login: repeated wrong passwords are locked out', async () => {
+  let last;
+  for (let i = 0; i < 6; i += 1) {
+    last = await api('POST', '/auth/login', { body: { username: 'no.such.user', password: 'wrong' } });
+  }
+  assert.equal(last.status, 429);
+});
+
+test('config: the server refuses an example or missing JWT secret', () => {
+  const ok = { DATABASE_URL: 'postgres://x', JWT_SECRET: 'a-long-private-secret-value' };
+  assert.doesNotThrow(() => assertConfig(ok));
+  assert.throws(() => assertConfig({ ...ok, JWT_SECRET: 'change-this-secret' }));
+  assert.throws(() => assertConfig({ ...ok, JWT_SECRET: '' }));
+  assert.throws(() => assertConfig({ JWT_SECRET: ok.JWT_SECRET }));
 });

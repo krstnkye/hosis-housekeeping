@@ -21,10 +21,12 @@ flowchart, UI screens, database dictionary, tests, and user manual.
 
 ## Running it locally
 
-1. Create a PostgreSQL database and load the schema and sample data:
+1. Create a PostgreSQL database and load the shared tables, the schema and the
+   sample data (the seed resets all Housekeeping demo data each time it runs):
 
    ```bash
    createdb hosis
+   psql hosis -f database/standalone/00-shared-tables.sql
    psql hosis -f database/schema/06-housekeeping.sql
    psql hosis -f database/seed/06-housekeeping-seed.sql
    ```
@@ -33,7 +35,7 @@ flowchart, UI screens, database dictionary, tests, and user manual.
 
    ```bash
    cd backend
-   cp .env.example .env      # then set DATABASE_URL and JWT_SECRET
+   cp .env.example .env      # then set DATABASE_URL and a long JWT_SECRET
    npm install
    npm run dev               # http://localhost:5000
    ```
@@ -46,8 +48,8 @@ flowchart, UI screens, database dictionary, tests, and user manual.
    npm run dev               # http://localhost:5173
    ```
 
-4. Run the API tests (they use the database in `DATABASE_URL`, so use a
-   freshly seeded one):
+4. Run the API tests (they reload the seed, which resets Housekeeping data in
+   the database in `DATABASE_URL`, so use a development or test database):
 
    ```bash
    cd backend
@@ -61,10 +63,11 @@ username also works).
 
 | Email / username | Position    | Can do                                              |
 | ---------------- | ----------- | --------------------------------------------------- |
-| `TabudloHK@gmail.com` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules |
+| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules |
 | `hk.inspector`  | Inspector   | Inspect rooms, plus general housekeeping functions  |
 | `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks, requests, lost & found, maintenance |
-| `fo.desk`       | Front Office | Is denied at the Housekeeping login                |
+| `fo.desk`       | Front Office | Is denied at the Housekeeping login; uses the Front Office endpoints |
+| `eng.tech`      | Engineering  | Is denied at the Housekeeping login; uses the Engineering endpoints |
 
 ## Flowchart to feature map
 
@@ -91,18 +94,41 @@ username also works).
 | HK-013 Record Request, Assign / Process | Guest Request (Status and Priority filters; Export PDF / Excel) | `GET /guest-requests?view=all`, `POST /guest-requests`, `PATCH /guest-requests/:id` |
 | HK-014 Complete Request | Guest Request | `POST /guest-requests/:id/complete` |
 | HK-015 Create Maintenance Request, Set Room OUT OF ORDER | Maintenance (Submit & Notify) | `POST /maintenance`, `GET /maintenance?view=all` |
-| Engineering Completes Repair | Maintenance | `PATCH /maintenance/:id` (`status: REPAIRED`) |
+| Engineering Completes Repair | (Engineering) | `PATCH /maintenance/:id/status` (`status: REPAIRED`), ENGINEERING role |
 | Update Status / Create Cleaning Task | Maintenance | `POST /maintenance/:id/release` |
 
 All API paths above are under `/api/housekeeping` and need a JWT from a
-HOUSEKEEPING (or ADMIN) account.
+HOUSEKEEPING (or ADMIN) account, except the Engineering and Front Office
+endpoints listed below.
+
+## Endpoints for other departments
+
+| Department | Endpoint | Purpose |
+| ---------- | -------- | ------- |
+| Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
+| Front Office | `GET /api/housekeeping/notifications?unread=1` | "Room ready" notices raised when a room passes inspection |
+| Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
+| Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
+| Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` (REPAIRED lets Housekeeping release the room) |
+
+While the Engineering module does not exist yet, record a repair for a demo
+with the seeded `eng.tech` account (backend running):
+
+```bash
+cd backend
+npm run engineering -- list
+npm run engineering -- 1 REPAIRED
+```
 
 ## Business rules
 
-* **Room status lifecycle.** Housekeeping changes DIRTY → CLEAN → INSPECTED.
-  Front Office owns AVAILABLE, RESERVED and OCCUPIED, so Housekeeping cannot
-  set those. A room leaves OUT_OF_ORDER only when its maintenance request is
-  released. Every change is written to `hk_room_status_logs`.
+* **Room status lifecycle.** By hand, Housekeeping can only set DIRTY or
+  CLEAN (see `MANUAL_TRANSITIONS` in `roomStatus.js`). CLEAN comes from
+  completing a task, INSPECTED only from a passed inspection, and OUT_OF_ORDER
+  only from a maintenance request. Front Office owns AVAILABLE, RESERVED and
+  OCCUPIED. A room leaves OUT_OF_ORDER only when its maintenance request is
+  released, and no task can be started, completed or inspected while it is out
+  of order. Every change is written to `hk_room_status_logs`.
 * **Cleaning tasks** go PENDING → ASSIGNED → IN_PROGRESS → COMPLETED →
   INSPECTED. A failed inspection sets the task to RETURNED and the room back
   to DIRTY; the same housekeeper cleans it again. A room can only have one open
@@ -113,16 +139,18 @@ HOUSEKEEPING (or ADMIN) account.
 * **Lost & found.** An item is released only when the claimant's ID is
   verified and their description matches; otherwise the claim is saved as
   REJECTED and the item stays stored.
-* **Maintenance.** Reporting can set the room OUT_OF_ORDER. When Engineering
-  marks the repair REPAIRED, Housekeeping releases it: the room becomes DIRTY
-  and a high-priority POST_REPAIR cleaning task is created.
+* **Maintenance.** Reporting can set the room OUT_OF_ORDER (not while it is
+  OCCUPIED or RESERVED; Front Office moves the guest first). Only Engineering
+  marks the repair REPAIRED. Housekeeping then releases it: the room becomes
+  DIRTY and gets a high-priority cleaning task (a new POST_REPAIR task, or the
+  task that was open when the room went out of order, reopened).
 
 ## UI revision (10/28/2026)
 
 Changes asked for by the professor:
 
 * Sidebar has a minimize button; collapsed, only the icons remain.
-* Login asks for the staff email (e.g. `TabudloHK@gmail.com`) and shows a red
+* Login asks for the staff email (e.g. `maria.santos@grandhorizon.ph`) and shows a red
   warning under an empty field.
 * Every page shows its name as the title in the top bar, plus a notification
   bell. The top search bar is gone; lists keep their own search box.
@@ -149,11 +177,10 @@ PDF and Excel files are generated in the browser with `jspdf`,
 
 * Housekeeping tables use the `hk_` prefix so they never clash with other
   departments' tables.
-* `06-housekeeping.sql` also creates minimal `users`, `rooms` and `guests`
-  tables with `CREATE TABLE IF NOT EXISTS`, because `01-users.sql`,
-  `03-guests.sql` and `04-rooms.sql` are still empty. When the owners of those
-  files define the real tables (keeping the same column names), ours are
-  skipped automatically.
+* `06-housekeeping.sql` only creates `hk_` tables. The minimal `users`,
+  `rooms` and `guests` tables for running standalone are in
+  `database/standalone/00-shared-tables.sql`, which must not be loaded in the
+  combined HOSIS database.
 * `backend/src/app.js` mounts each subsystem's router
   (`app.use('/api/<subsystem>', ...)`), so other groups can add theirs next to
   `/api/housekeeping`.

@@ -3,7 +3,7 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
 const { requirePosition } = require('../../middleware/auth');
-const { changeRoomStatus } = require('./roomStatus');
+const { changeRoomStatus, assertNotOutOfOrder } = require('./roomStatus');
 
 const router = express.Router();
 
@@ -69,6 +69,7 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
     if (task.task_status !== 'COMPLETED') {
       throw new HttpError(409, 'Only completed cleaning tasks can be inspected.');
     }
+    await assertNotOutOfOrder(client, task.room_id);
     const { rows } = await client.query(
       `INSERT INTO hk_inspections (task_id, inspected_by, inspection_result, checklist, remarks)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,

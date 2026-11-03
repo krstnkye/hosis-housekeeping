@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const { authenticate } = require('../../middleware/auth');
+const { checkLoginAllowed, recordLoginFailure, clearLoginFailures } = require('../../middleware/loginLimiter');
 
 const router = express.Router();
 
@@ -16,6 +17,7 @@ router.post('/login', async (req, res) => {
   if (!username || !password) {
     throw new HttpError(400, 'Email and password are required.');
   }
+  checkLoginAllowed(req);
 
   const { rows } = await db.query(
     `SELECT user_id, first_name, last_name, username, password_hash, role, position, employment_status
@@ -24,8 +26,10 @@ router.post('/login', async (req, res) => {
   );
   const user = rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    recordLoginFailure(req);
     throw new HttpError(401, 'Incorrect email or password.');
   }
+  clearLoginFailures(req);
   if (user.employment_status !== 'ACTIVE') {
     throw new HttpError(403, 'Access denied - this account is not active.');
   }

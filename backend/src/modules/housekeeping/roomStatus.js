@@ -3,15 +3,17 @@ const HttpError = require('../../utils/httpError');
 const ROOM_STATUSES = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'DIRTY', 'CLEAN', 'INSPECTED', 'OUT_OF_ORDER'];
 
 // Status changes Housekeeping may make by hand from the Room Status page (HK-003).
-// Front Office owns AVAILABLE/RESERVED/OCCUPIED, so Housekeeping never sets those,
-// and a room leaves OUT_OF_ORDER only through a released maintenance request.
+// - Front Office owns AVAILABLE/RESERVED/OCCUPIED, so Housekeeping never sets those.
+// - INSPECTED is set only by a passed inspection (HK-007), so every pass is recorded.
+// - OUT_OF_ORDER is set only through a maintenance request (HK-015), and a room
+//   leaves it only when that request is released after Engineering's repair.
 const MANUAL_TRANSITIONS = {
-  AVAILABLE: ['DIRTY', 'OUT_OF_ORDER'],
-  RESERVED: ['OUT_OF_ORDER'],
-  OCCUPIED: ['DIRTY', 'OUT_OF_ORDER'],
-  DIRTY: ['CLEAN', 'OUT_OF_ORDER'],
-  CLEAN: ['DIRTY', 'INSPECTED', 'OUT_OF_ORDER'],
-  INSPECTED: ['DIRTY', 'OUT_OF_ORDER'],
+  AVAILABLE: ['DIRTY'],
+  RESERVED: [],
+  OCCUPIED: ['DIRTY'],
+  DIRTY: ['CLEAN'],
+  CLEAN: ['DIRTY'],
+  INSPECTED: ['DIRTY'],
   OUT_OF_ORDER: [],
 };
 
@@ -30,13 +32,25 @@ async function notifyFrontOffice(client, roomId, message, staffId) {
   );
 }
 
+function outOfOrderError(room) {
+  return new HttpError(
+    409,
+    `Room ${room.room_number} is OUT OF ORDER. It can only be released from its maintenance request after Engineering completes the repair.`
+  );
+}
+
 // Changes a room's status and writes the change to the room status log.
 // Workflow steps (task completion, inspection, maintenance) pass manual=false
-// because their own rules already decide the next status.
-async function changeRoomStatus(client, { roomId, newStatus, staffId, remarks, manual = true }) {
+// because their own rules already decide the next status. Only the maintenance
+// release passes releaseOutOfOrder=true, so no other step can move a room out
+// of OUT_OF_ORDER while it is waiting for a repair.
+async function changeRoomStatus(client, { roomId, newStatus, staffId, remarks, manual = true, releaseOutOfOrder = false }) {
   const room = await lockRoom(client, roomId);
   if (room.room_status === newStatus) {
     return room;
+  }
+  if (room.room_status === 'OUT_OF_ORDER' && !releaseOutOfOrder) {
+    throw outOfOrderError(room);
   }
   if (manual && !MANUAL_TRANSITIONS[room.room_status].includes(newStatus)) {
     throw new HttpError(
@@ -65,4 +79,20 @@ async function changeRoomStatus(client, { roomId, newStatus, staffId, remarks, m
   return rows[0];
 }
 
-module.exports = { ROOM_STATUSES, MANUAL_TRANSITIONS, changeRoomStatus, lockRoom, notifyFrontOffice };
+// Stops cleaning and inspection steps on a room that is waiting for a repair.
+async function assertNotOutOfOrder(client, roomId) {
+  const room = await lockRoom(client, roomId);
+  if (room.room_status === 'OUT_OF_ORDER') {
+    throw outOfOrderError(room);
+  }
+  return room;
+}
+
+module.exports = {
+  ROOM_STATUSES,
+  MANUAL_TRANSITIONS,
+  changeRoomStatus,
+  lockRoom,
+  notifyFrontOffice,
+  assertNotOutOfOrder,
+};
