@@ -2207,6 +2207,28 @@ body.hk-no-scroll {
     min-width: 0;
   }
 
+  .hk-inline-field {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .hk-inline-field select {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  .hk-app select,
+  .hk-app input,
+  .hk-app textarea {
+    max-width: 100%;
+  }
+
+  /* Last guard: nothing inside the app may make the page scroll sideways. */
+  .hk-app,
+  .hk-login {
+    overflow-x: clip;
+  }
+
   .hk-form {
     grid-template-columns: 1fr;
   }
