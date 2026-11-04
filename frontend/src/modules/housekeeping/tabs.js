@@ -10,3 +10,10 @@ export const TABS = [
   { id: 'requests', name: 'Guest Requests', icon: 'M12 21a9 9 0 1 1 6.4-15.4M21 4l-9 9-3-3M9.5 15.5h4' },
   { id: 'maintenance', name: 'Maintenance', icon: 'M7 3h10v4H7zM9 7v14h6V7M9 12h6M9 16h6' },
 ]
+
+// Extra pages in the housekeeping staff menu (Staff Dashboard).
+export const STAFF_TABS = [
+  { id: 'report', name: 'Report Room', icon: 'M5 21V4h11l-1.5 4L16 12H5M9 8h2' },
+  { id: 'record', name: 'My Record', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6' },
+  { id: 'account', name: 'Account', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
+]

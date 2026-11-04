@@ -10,6 +10,11 @@ export function label(value) {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+// Staff ID shown on the account and personal record, e.g. HK-0003.
+export function staffId(userId) {
+  return `HK-${String(userId).padStart(4, '0')}`
+}
+
 export function formatTime(value) {
   if (!value) return '-'
   // TIME columns arrive as "13:00:00"

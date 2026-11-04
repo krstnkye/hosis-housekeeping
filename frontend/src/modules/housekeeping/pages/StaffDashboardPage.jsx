@@ -21,7 +21,7 @@ const SHORTCUTS = [
   { href: '#/housekeeping/tasks', title: 'My cleaning tasks', note: 'Start and finish your rooms', icon: 'M4 21V9h7v12M11 21V5h9v16M14 9h3M14 13h3M7 13h1M4 21h16' },
   { href: '#/housekeeping/requests', title: 'Guest requests', note: 'Deliver towels, amenities and more', icon: 'M12 21a9 9 0 1 1 6.4-15.4M21 4l-9 9-3-3M9.5 15.5h4' },
   { href: '#/housekeeping/lost-found', title: 'Record a found item', note: 'Log belongings left in a room', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 14v3' },
-  { href: '#/housekeeping/maintenance', title: 'Report a defect', note: 'Send a repair to Engineering', icon: 'M7 3h10v4H7zM9 7v14h6V7M9 12h6M9 16h6' },
+  { href: '#/housekeeping/report', title: 'Report room condition', note: 'Tell Front Office or Maintenance', icon: 'M5 21V4h11l-1.5 4L16 12H5M9 8h2' },
 ]
 
 function plural(n, word) {
@@ -165,7 +165,7 @@ export default function StaffDashboardPage({ user }) {
         </div>
 
         <div className="hk-stack">
-          <Card title="My shift today" actions={<a className="hk-link" href="#/housekeeping/schedules">My Schedule</a>}>
+          <Card title="My shift today" actions={<a className="hk-link" href="#/housekeeping/schedules">Schedules</a>}>
             {shift ? (
               <div className="hk-next-shift">
                 <span>{label(shift.shift)} shift</span>

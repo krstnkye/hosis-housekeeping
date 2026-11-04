@@ -421,6 +421,63 @@ test('front office: checkout creates a task, notifications can be marked read', 
   assert.equal(after.body.notifications.some((n) => n.notification_id === id), false);
 });
 
+test('account: staff see their account and change their own password', async () => {
+  const joy = await login('hk.joy');
+  const account = await api('GET', '/auth/account', { token: joy.token });
+  assert.equal(account.status, 200);
+  assert.equal(account.body.account.username, 'hk.joy');
+  assert.equal(account.body.account.email, 'joy.delacruz@grandhorizon.ph');
+  assert.equal(account.body.account.password_hash, undefined);
+
+  const change = (currentPassword, newPassword) =>
+    api('POST', '/auth/password', { token: joy.token, body: { currentPassword, newPassword } });
+  assert.equal((await change('wrong-password', 'new-password-1')).status, 400);
+  assert.equal((await change('password123', 'short')).status, 400);
+  assert.equal((await change('password123', 'password123')).status, 400);
+  assert.equal((await change('password123', 'new-password-1')).status, 200);
+
+  const old = await api('POST', '/auth/login', { body: { username: 'hk.joy', password: 'password123', department: 'HOUSEKEEPING' } });
+  assert.equal(old.status, 401);
+  const fresh = await api('POST', '/auth/login', { body: { username: 'hk.joy', password: 'new-password-1', department: 'HOUSEKEEPING' } });
+  assert.equal(fresh.status, 200);
+  // Put the demo password back for the other tests.
+  assert.equal((await change('new-password-1', 'password123')).status, 200);
+});
+
+test('room condition: staff report to Front Office and see their reports and record', async () => {
+  const liza = await login('hk.liza');
+  const room = await roomId('104');
+  const bad = await api('POST', '/housekeeping/room-reports', { token: liza.token, body: { roomId: room, condition: 'BROKEN', details: 'x' } });
+  assert.equal(bad.status, 400);
+  const sent = await api('POST', '/housekeeping/room-reports', {
+    token: liza.token,
+    body: { roomId: room, condition: 'DAMAGED', details: 'Cracked bathroom mirror' },
+  });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.body.notification.notice_type, 'ROOM_CONDITION');
+  assert.match(sent.body.notification.message, /Room 104 condition \(damaged\): Cracked bathroom mirror/);
+
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  const notices = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.body.token });
+  assert.ok(notices.body.notifications.some((n) => n.notification_id === sent.body.notification.notification_id && n.notice_type === 'ROOM_CONDITION'));
+
+  const issue = await api('POST', '/housekeeping/maintenance', {
+    token: liza.token,
+    body: { roomId: room, category: 'FURNITURE', description: 'Cracked bathroom mirror' },
+  });
+  assert.equal(issue.status, 201);
+  const reports = await api('GET', '/housekeeping/me/reports', { token: liza.token });
+  assert.equal(reports.status, 200);
+  assert.deepEqual(new Set(reports.body.reports.filter((r) => r.room_number === '104').map((r) => r.sent_to)), new Set(['FRONT_OFFICE', 'MAINTENANCE']));
+
+  const record = await api('GET', '/housekeeping/me/record', { token: liza.token });
+  assert.equal(record.status, 200);
+  assert.equal(record.body.profile.username, 'hk.liza');
+  assert.ok(record.body.totals.conditions_reported >= 1);
+  assert.ok(record.body.totals.issues_reported >= 1);
+  assert.ok(record.body.recent.some((a) => a.type === 'ROOM_CONDITION'));
+});
+
 test('login: repeated wrong passwords are locked out', async () => {
   let last;
   for (let i = 0; i < 6; i += 1) {

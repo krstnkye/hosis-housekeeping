@@ -70,6 +70,8 @@ const HK = '/housekeeping'
 
 export const api = {
   login: (body) => request('POST', '/auth/login', body),
+  account: () => request('GET', '/auth/account'),
+  changePassword: (body) => request('POST', '/auth/password', body),
 
   dashboard: () => request('GET', `${HK}/dashboard`),
   staff: () => request('GET', `${HK}/staff`),
@@ -114,4 +116,8 @@ export const api = {
   reportIssue: (body) => request('POST', `${HK}/maintenance`, body),
   updateIssue: (id, body) => request('PATCH', `${HK}/maintenance/${id}`, body),
   releaseRoom: (id) => request('POST', `${HK}/maintenance/${id}/release`),
+
+  myRecord: () => request('GET', `${HK}/me/record`),
+  myReports: () => request('GET', `${HK}/me/reports`),
+  reportCondition: (body) => request('POST', `${HK}/room-reports`, body),
 }
