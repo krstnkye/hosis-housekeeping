@@ -39,7 +39,7 @@ router.get('/alerts', async (req, res) => {
     `SELECT * FROM (
        SELECT 'ROOM_READY' AS type, n.message, n.created_at AS at, 'rooms' AS page
          FROM hk_front_office_notifications n
-        WHERE n.created_at > NOW() - INTERVAL '1 day'
+        WHERE n.created_at > NOW() - INTERVAL '1 day' AND n.notice_type = 'ROOM_READY'
        UNION ALL
        SELECT 'TASK', CONCAT('Room ', r.room_number, ': ', LOWER(REPLACE(t.task_type, '_', ' ')),
               CASE WHEN t.task_status = 'RETURNED' THEN ' returned for re-cleaning' ELSE ' assigned to you' END),
@@ -105,5 +105,6 @@ router.use('/schedules', require('./schedules.routes'));
 router.use('/guest-requests', require('./guestRequests.routes'));
 router.use('/lost-found', require('./lostFound.routes'));
 router.use('/maintenance', require('./maintenance.routes'));
+router.use(require('./me.routes'));
 
 module.exports = router;

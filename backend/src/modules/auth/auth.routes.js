@@ -54,4 +54,47 @@ router.get('/me', authenticate, (req, res) => {
   res.json({ user: req.user });
 });
 
+// GET /api/auth/account: the signed-in user's own account details.
+router.get('/account', authenticate, async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT user_id, username, email, first_name, last_name, role, position, employment_status, created_at
+       FROM users WHERE user_id = $1`,
+    [req.user.userId]
+  );
+  if (!rows[0]) {
+    throw new HttpError(404, 'Account not found.');
+  }
+  res.json({ account: rows[0] });
+});
+
+const MIN_PASSWORD = 8;
+
+// POST /api/auth/password  { currentPassword, newPassword }
+// Staff change their own password. The current password must be given, and
+// wrong attempts count toward the same lockout as the login page.
+router.post('/password', authenticate, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    throw new HttpError(400, 'Current and new password are required.');
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD || newPassword.length > 72) {
+    throw new HttpError(400, `The new password must be ${MIN_PASSWORD} to 72 characters long.`);
+  }
+  // Same lockout key as the login page: this address plus this account.
+  const attempt = { ip: req.ip, body: { username: req.user.username } };
+  checkLoginAllowed(attempt);
+  const { rows } = await db.query('SELECT password_hash FROM users WHERE user_id = $1', [req.user.userId]);
+  if (!rows[0] || !(await bcrypt.compare(currentPassword, rows[0].password_hash))) {
+    recordLoginFailure(attempt);
+    throw new HttpError(400, 'Your current password is incorrect.');
+  }
+  clearLoginFailures(attempt);
+  if (await bcrypt.compare(newPassword, rows[0].password_hash)) {
+    throw new HttpError(400, 'The new password must be different from the current one.');
+  }
+  const hash = await bcrypt.hash(newPassword, 10);
+  await db.query('UPDATE users SET password_hash = $1 WHERE user_id = $2', [hash, req.user.userId]);
+  res.json({ ok: true });
+});
+
 module.exports = router;

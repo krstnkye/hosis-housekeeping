@@ -24,8 +24,9 @@ function plural(n, word) {
 
 // HK-008 View Staff Schedule, HK-009 Create/Update Schedule, Assign Workload/Shift.
 export default function SchedulesPage({ user, search }) {
-  const [mode, setMode] = useState(user.position === 'HOUSEKEEPER' ? 'mine' : 'staff')
-  if (user.position === 'HOUSEKEEPER') return <MySchedulePage user={user} />
+  // Housekeepers start on their own schedule and can view the team's (read only).
+  const staffMember = user.position === 'HOUSEKEEPER'
+  const [mode, setMode] = useState(staffMember ? 'mine' : 'staff')
   return (
     <div className="hk-stack">
       <div className="hk-segmented" role="group" aria-label="Schedule view">
@@ -33,7 +34,7 @@ export default function SchedulesPage({ user, search }) {
           My schedule
         </button>
         <button type="button" className={mode === 'staff' ? 'is-active' : ''} aria-pressed={mode === 'staff'} onClick={() => setMode('staff')}>
-          HK staff
+          {staffMember ? 'Team schedule' : 'HK staff'}
         </button>
       </div>
       {mode === 'mine' ? <MySchedulePage user={user} /> : <StaffSchedules user={user} search={search} />}
@@ -110,7 +111,9 @@ function StaffSchedules({ user, search }) {
           />
           {onDuty.length > 0 && (
             <Notice tone="violet" title={`${plural(assigned, 'cleaning task')} allocated · ${completed} complete · ${assigned - completed} remaining`}>
-              Move rooms between housekeepers on the Cleaning Tasks page to balance the workload.
+              {isSupervisor
+                ? 'Move rooms between housekeepers on the Cleaning Tasks page to balance the workload.'
+                : 'Pick a shift to see its details. Only supervisors can change schedules.'}
             </Notice>
           )}
         </Card>
@@ -126,7 +129,9 @@ function StaffSchedules({ user, search }) {
         </Card>
       </div>
 
-      {staff.data ? (
+      {!isSupervisor ? (
+        <ShiftDetails schedule={selected || onDuty.find((s) => s.staff_id === user.userId)} />
+      ) : staff.data ? (
         <ScheduleForm
           key={selected?.schedule_id || `new-${date}`}
           schedule={selected}
@@ -147,6 +152,31 @@ function StaffSchedules({ user, search }) {
         <Card title="Create / update schedule"><LoadState loading={staff.loading} error={staff.error} /></Card>
       )}
     </div>
+  )
+}
+
+// Read-only shift details for staff who cannot change schedules.
+function ShiftDetails({ schedule }) {
+  return (
+    <Card title="Shift details" subtitle={schedule ? `${schedule.staff_name} · ${label(schedule.position)}` : 'Select a shift in the list'}>
+      {schedule ? (
+        <>
+          <div className="hk-next-shift">
+            <span>{label(schedule.shift)} shift · {longDate(schedule.shift_date, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <strong>{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</strong>
+            <small>{schedule.assigned_area}</small>
+          </div>
+          <dl className="hk-facts hk-facts--spaced">
+            <dt>Rooms assigned</dt><dd>{plural(schedule.assigned_tasks, 'room')}</dd>
+            <dt>Completed</dt><dd>{schedule.completed_tasks || 0} / {schedule.assigned_tasks}</dd>
+            <dt>Notes</dt><dd>{schedule.notes || 'None'}</dd>
+          </dl>
+        </>
+      ) : (
+        <p className="hk-muted">Nobody selected.</p>
+      )}
+      <Notice tone="amber" title="View only">Only supervisors can create or change schedules. Ask your supervisor for a swap or a day off.</Notice>
+    </Card>
   )
 }
 

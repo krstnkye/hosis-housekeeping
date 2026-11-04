@@ -72,6 +72,10 @@ username also works).
 | -------------- | ------ | --- |
 | Housekeeping Staff Log In / Authorized? / Access Denied | Login | `POST /api/auth/login` with `department: HOUSEKEEPING` |
 | Housekeeping Dashboard / Select Function | Overview | `GET /dashboard` |
+| Housekeeping Dashboard (housekeepers) | Staff Dashboard: own tasks with Start / Complete, own guest requests, today's shift, notifications | `GET /tasks?mine=1`, `GET /guest-requests`, `GET /schedules/mine`, `GET /alerts` |
+| Staff account | Account | `GET /api/auth/account`, `POST /api/auth/password` |
+| Staff personal record | My Record | `GET /me/record` |
+| Report room condition to Front Office / Maintenance | Report Room | `POST /room-reports` (Front Office notice), `POST /maintenance`, `GET /me/reports` |
 | HK-001 View Room Status | Room Status | `GET /rooms` |
 | HK-002 Select Room | Room Status (right panel) | `GET /rooms/:id` |
 | HK-003 Update Room Status (logged) | Room Status | `PATCH /rooms/:id/status` |
@@ -101,7 +105,7 @@ endpoints listed below.
 | Department | Endpoint | Purpose |
 | ---------- | -------- | ------- |
 | Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
-| Front Office | `GET /api/housekeeping/notifications?unread=1` | "Room ready" notices raised when a room passes inspection |
+| Front Office | `GET /api/housekeeping/notifications?unread=1` | Notices from Housekeeping: `notice_type` ROOM_READY (room passed inspection) or ROOM_CONDITION (a staff member's room condition report) |
 | Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
 | Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
 | Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` (REPAIRED lets Housekeeping release the room) |

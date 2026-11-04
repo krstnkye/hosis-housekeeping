@@ -71,7 +71,7 @@ HOSIS tables that must exist before `06-housekeeping.sql` is loaded:
 | Department | Endpoint | Purpose |
 | --- | --- | --- |
 | Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
-| Front Office | `GET /api/housekeeping/notifications?unread=1` | "Room ready" notices raised when a room passes inspection |
+| Front Office | `GET /api/housekeeping/notifications?unread=1` | Notices from Housekeeping: `notice_type` ROOM_READY (room passed inspection) or ROOM_CONDITION (a staff member reported a room's condition: damage, missing items, smoking, ...) |
 | Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
 | Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
 | Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` |

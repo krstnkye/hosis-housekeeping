@@ -142,17 +142,25 @@ CREATE TABLE IF NOT EXISTS hk_maintenance_requests (
     resolved_at       TIMESTAMP
 );
 
--- Front Office notifications raised by Housekeeping, e.g. when a room
--- passes inspection and is ready to be released (flowchart:
--- "Notify Front Office of Room Availability").
+-- Front Office notifications raised by Housekeeping: ROOM_READY when a room
+-- passes inspection and is ready to be released (flowchart: "Notify Front
+-- Office of Room Availability"), ROOM_CONDITION when a staff member reports
+-- a room's condition (damage, missing items, smoking, ...) to Front Office.
 CREATE TABLE IF NOT EXISTS hk_front_office_notifications (
     notification_id SERIAL PRIMARY KEY,
     room_id         INT          NOT NULL REFERENCES rooms(room_id),
+    notice_type     VARCHAR(20)  NOT NULL DEFAULT 'ROOM_READY'
+        CHECK (notice_type IN ('ROOM_READY', 'ROOM_CONDITION')),
     message         VARCHAR(255) NOT NULL,
     created_by      INT          REFERENCES users(user_id),
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
     read_at         TIMESTAMP
 );
+
+-- Databases created before notice_type existed get the column here.
+ALTER TABLE hk_front_office_notifications
+    ADD COLUMN IF NOT EXISTS notice_type VARCHAR(20) NOT NULL DEFAULT 'ROOM_READY'
+        CHECK (notice_type IN ('ROOM_READY', 'ROOM_CONDITION'));
 
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_status   ON hk_cleaning_tasks (task_status);
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_staff    ON hk_cleaning_tasks (staff_id);

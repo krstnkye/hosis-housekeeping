@@ -32,7 +32,7 @@ INSERT INTO users (first_name, last_name, username, email, password_hash, role, 
     ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL),
     ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'ENGINEERING', 'TECHNICIAN')
-ON CONFLICT (username) DO UPDATE SET email = EXCLUDED.email, employment_status = 'ACTIVE';
+ON CONFLICT (username) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash, employment_status = 'ACTIVE';
 
 INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES
     ('101', 'Standard', 1, 'AVAILABLE'),
