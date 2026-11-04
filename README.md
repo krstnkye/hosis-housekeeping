@@ -72,6 +72,7 @@ username also works).
 | -------------- | ------ | --- |
 | Housekeeping Staff Log In / Authorized? / Access Denied | Login | `POST /api/auth/login` with `department: HOUSEKEEPING` |
 | Housekeeping Dashboard / Select Function | Overview | `GET /dashboard` |
+| Housekeeping Dashboard (housekeepers) | Staff Dashboard: own tasks with Start / Complete, own guest requests, today's shift, notifications | `GET /tasks?mine=1`, `GET /guest-requests`, `GET /schedules/mine`, `GET /alerts` |
 | HK-001 View Room Status | Room Status | `GET /rooms` |
 | HK-002 Select Room | Room Status (right panel) | `GET /rooms/:id` |
 | HK-003 Update Room Status (logged) | Room Status | `PATCH /rooms/:id/status` |

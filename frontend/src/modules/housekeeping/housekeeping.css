@@ -2491,3 +2491,235 @@ body.hk-no-scroll {
     opacity: 0.75;
   }
 }
+
+/* Staff Dashboard (housekeepers): next room, own requests, notifications, shortcuts. */
+.hk-staff-next {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.hk-staff-next__room {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  padding: 14px 12px;
+  border-radius: 10px;
+  background: var(--hk-navy);
+  color: #fff;
+  text-align: center;
+}
+
+.hk-staff-next__room span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hk-gold);
+}
+
+.hk-staff-next__room strong {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.hk-staff-next__room small {
+  opacity: 0.85;
+  font-size: 0.75rem;
+}
+
+.hk-staff-next__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hk-staff-next__body p {
+  margin: 0;
+  color: var(--hk-navy);
+}
+
+.hk-staff-next__body .hk-actions {
+  justify-content: flex-start;
+}
+
+.hk-staff-list,
+.hk-staff-alerts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hk-staff-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hk-line);
+}
+
+.hk-staff-list li:last-child,
+.hk-staff-alerts li:last-child a {
+  border-bottom: 0;
+}
+
+.hk-staff-list li > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--hk-navy);
+  font-size: 0.88rem;
+}
+
+.hk-staff-list small,
+.hk-staff-alerts small {
+  color: var(--hk-muted);
+  font-size: 0.76rem;
+}
+
+.hk-staff-list__side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hk-staff-alerts a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hk-line);
+  color: var(--hk-navy);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+
+.hk-staff-alerts a:hover strong {
+  text-decoration: underline;
+}
+
+.hk-staff-alerts a > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hk-staff-alerts strong {
+  font-weight: 500;
+}
+
+.hk-staff-alerts__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--hk-lavender);
+  color: var(--hk-indigo);
+}
+
+.hk-staff-alerts__icon--task { background: #fff4cf; color: #8a6a05; }
+.hk-staff-alerts__icon--room_ready { background: #e3f3e6; color: #2f8a3e; }
+.hk-staff-alerts__icon--maintenance { background: #fde5e5; color: #c0392b; }
+
+.hk-staff-note {
+  margin: 10px 0 0;
+  font-size: 0.84rem;
+}
+
+.hk-staff-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hk-staff-shortcut {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hk-line);
+  background: #fff;
+  color: var(--hk-navy);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hk-staff-shortcut:hover,
+.hk-staff-shortcut:focus-visible {
+  border-color: var(--hk-gold);
+  box-shadow: 0 2px 6px rgba(18, 13, 92, 0.1);
+}
+
+.hk-staff-shortcut > svg {
+  flex-shrink: 0;
+  color: var(--hk-indigo);
+}
+
+.hk-staff-shortcut span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hk-staff-shortcut strong {
+  font-size: 0.86rem;
+}
+
+.hk-staff-shortcut small {
+  color: var(--hk-muted);
+  font-size: 0.74rem;
+}
+
+@media (max-width: 860px) {
+  /* Five stats in two columns: the last one spans the row. */
+  .hk-staff-stats > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .hk-staff-next {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hk-staff-next__room {
+    flex-direction: row;
+    gap: 10px;
+    justify-content: flex-start;
+  }
+
+  .hk-staff-next__room strong {
+    font-size: 1.5rem;
+  }
+
+  .hk-staff-next__body .hk-actions .hk-btn {
+    width: 100%;
+  }
+
+  .hk-staff-list li {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hk-staff-list__side {
+    justify-content: space-between;
+  }
+
+  .hk-staff-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

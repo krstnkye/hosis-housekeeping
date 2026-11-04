@@ -4,6 +4,7 @@ import { PageHeader, Sidebar, Topbar } from './components/Layout.jsx'
 import { TABS } from './tabs.js'
 import LoginPage from './pages/LoginPage.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
+import StaffDashboardPage from './pages/StaffDashboardPage.jsx'
 import RoomStatusPage from './pages/RoomStatusPage.jsx'
 import CleaningTasksPage from './pages/CleaningTasksPage.jsx'
 import InspectionPage from './pages/InspectionPage.jsx'
@@ -25,6 +26,13 @@ const PAGES = {
   requests: { component: GuestRequestsPage, title: 'Guest Request', subtitle: 'Assign and resolve guest needs without losing track of open work.' },
   maintenance: { component: MaintenancePage, title: 'Maintenance', subtitle: 'Report defects, coordinate with Engineering and protect room readiness.' },
 }
+
+// What regular housekeeping staff see in place of the supervisor pages.
+const STAFF_PAGES = {
+  overview: { component: StaffDashboardPage, title: 'Staff Dashboard', subtitle: 'Your rooms, guest requests and shift for today.' },
+  schedules: { ...PAGES.schedules, title: 'My Schedule', subtitle: 'Your shift, assigned rooms and remaining work for today.' },
+}
+const STAFF_HIDDEN = ['inspection']
 
 function currentTab() {
   const id = window.location.hash.replace('#/housekeeping/', '')
@@ -104,14 +112,16 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     )
   }
 
-  // Housekeepers get their own schedule page (Figma "My Schedule - HK staff").
-  const ownSchedule = session.user.position === 'HOUSEKEEPER'
-  const page =
-    ownSchedule && tab === 'schedules'
-      ? { ...PAGES.schedules, title: 'My Schedule', subtitle: 'Your shift, assigned rooms and remaining work for today.' }
-      : PAGES[tab]
+  // Housekeepers (regular staff) get the staff dashboard and their own schedule
+  // page (Figma "My Schedule - HK staff"). They cannot record inspections, so
+  // the Inspection page is left out of their menu.
+  const staff = session.user.position === 'HOUSEKEEPER'
+  const tabs = staff
+    ? TABS.filter((t) => !STAFF_HIDDEN.includes(t.id)).map((t) => (t.id === 'schedules' ? { ...t, name: 'My Schedule' } : t))
+    : TABS
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'overview'
+  const page = (staff && STAFF_PAGES[activeTab]) || PAGES[activeTab]
   const Page = page.component
-  const tabs = ownSchedule ? TABS.map((t) => (t.id === 'schedules' ? { ...t, name: 'My Schedule' } : t)) : TABS
 
   function toggleSidebar() {
     setCollapsed(!collapsed)
@@ -125,7 +135,7 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
   return (
     <div className={`hk-app${collapsed && !mobile ? ' is-collapsed' : ''}`}>
       <Sidebar
-        current={tab}
+        current={activeTab}
         tabs={tabs}
         collapsed={collapsed && !mobile}
         onToggle={toggleSidebar}
@@ -149,7 +159,7 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
         />
         <main className="hk-content">
           <PageHeader title={page.title} subtitle={page.subtitle} actions={<span className="hk-actions" ref={setHeaderActions} />} />
-          <Page key={tab} user={session.user} search="" headerActions={headerActions} />
+          <Page key={activeTab} user={session.user} search="" headerActions={headerActions} />
         </main>
         <footer className="hk-footer">
           <span>Grand Horizon Hotel · Housekeeping operations</span>
