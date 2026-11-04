@@ -59,10 +59,13 @@ export function Stat({ title, value, note, valueTone }) {
 }
 
 // Table whose rows can be selected (selected row is highlighted in gold).
+// On phones, tables with four or more columns show each row as a small card
+// (the column titles come from data-label).
 export function DataTable({ columns, rows, rowKey, selectedKey, onSelect, empty = 'No records found.', darkHover }) {
+  const stack = columns.length >= 4
   return (
     <div className="hk-table-wrap">
-      <table className={`hk-table${darkHover ? ' hk-table--dark-hover' : ''}`}>
+      <table className={`hk-table${darkHover ? ' hk-table--dark-hover' : ''}${stack ? ' hk-table--stack' : ''}`}>
         <thead>
           <tr>
             {columns.map((c) => (
@@ -89,7 +92,7 @@ export function DataTable({ columns, rows, rowKey, selectedKey, onSelect, empty 
                 onKeyDown={onSelect ? (e) => e.key === 'Enter' && onSelect(row) : undefined}
               >
                 {columns.map((c) => (
-                  <td key={c.key}>{c.render ? c.render(row) : row[c.key]}</td>
+                  <td key={c.key} data-label={c.title}>{c.render ? c.render(row) : row[c.key]}</td>
                 ))}
               </tr>
             )

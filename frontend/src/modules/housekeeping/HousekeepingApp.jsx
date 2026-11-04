@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { clearSession, getSession, setExternalSession, setUnauthorizedHandler } from './api.js'
 import { PageHeader, Sidebar, Topbar } from './components/Layout.jsx'
 import { TABS } from './tabs.js'
@@ -31,6 +31,20 @@ function currentTab() {
   return TABS.some((t) => t.id === id) ? id : 'overview'
 }
 
+// Phones and small tablets get the drawer menu instead of the fixed sidebar.
+const MOBILE_QUERY = '(max-width: 860px)'
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY)
+    const onChange = () => setMobile(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return mobile
+}
+
 const ALLOWED_ROLES = ['HOUSEKEEPING', 'ADMIN']
 
 // Standalone: <HousekeepingApp /> shows its own login page.
@@ -51,8 +65,16 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     }
   })
 
+  const mobile = useIsMobile()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+
   useEffect(() => {
-    const onHash = () => setTab(currentTab())
+    const onHash = () => {
+      setTab(currentTab())
+      setMenuOpen(false)
+      window.scrollTo(0, 0)
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -101,11 +123,21 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
   }
 
   return (
-    <div className={`hk-app${collapsed ? ' is-collapsed' : ''}`}>
-      <Sidebar current={tab} tabs={tabs} collapsed={collapsed} onToggle={toggleSidebar} />
+    <div className={`hk-app${collapsed && !mobile ? ' is-collapsed' : ''}`}>
+      <Sidebar
+        current={tab}
+        tabs={tabs}
+        collapsed={collapsed && !mobile}
+        onToggle={toggleSidebar}
+        mobile={mobile}
+        open={mobile && menuOpen}
+        onClose={closeMenu}
+      />
       <div className="hk-main">
         <Topbar
           user={session.user}
+          onMenu={mobile ? () => setMenuOpen(true) : null}
+          menuOpen={mobile && menuOpen}
           onLogout={() => {
             if (shellLogout) {
               shellLogout()
