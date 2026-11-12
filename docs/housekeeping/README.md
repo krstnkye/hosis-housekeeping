@@ -1,150 +1,15 @@
-# HOSIS Housekeeping Subsystem
+# HOSIS Housekeeping Subsystem: documentation folder
 
-The Housekeeping module of HOSIS, built from the Housekeeping Department
-Flowchart (`docs/Flowchart/housekeeping-department-flowchart.drawio`), the
-Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
+This folder holds the Housekeeping group's documents. How to run the app, the
+sample accounts, the feature map, the API, and the business rules are in the
+repository's main [README](../../README.md).
 
-| Layer    | Location                                         |
-| -------- | ------------------------------------------------ |
-| Database | `database/schema/06-housekeeping.sql`, `database/seed/06-housekeeping-seed.sql` |
-| Backend  | `backend/src/modules/housekeeping/` (REST API under `/api/housekeeping`) |
-| Login    | `backend/src/modules/auth/` (`POST /api/auth/login`, JWT) |
-| Frontend | `frontend/src/modules/housekeeping/` |
-| Tests    | `backend/test/housekeeping.test.js` |
-
-## Documentation
-
-The current Housekeeping-only project document is
-[`documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx`](documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx).
-Older versions stay in the same folder for reference.
-It keeps the professor's required format and covers the implemented ERD, DFD,
-flowchart, UI screens, database dictionary, tests, and user manual.
-
-## Running it locally
-
-1. Create a PostgreSQL database and load the shared tables, the schema and the
-   sample data (the seed resets all Housekeeping demo data each time it runs):
-
-   ```bash
-   createdb hosis
-   psql hosis -f database/standalone/00-shared-tables.sql
-   psql hosis -f database/schema/06-housekeeping.sql
-   psql hosis -f database/seed/06-housekeeping-seed.sql
-   ```
-
-2. Start the backend:
-
-   ```bash
-   cd backend
-   cp .env.example .env      # then set DATABASE_URL and a long JWT_SECRET
-   npm install
-   npm run dev               # http://localhost:5000
-   ```
-
-3. Start the frontend (it forwards `/api` to the backend):
-
-   ```bash
-   cd frontend
-   npm install
-   npm run dev               # http://localhost:5173
-   ```
-
-4. Run the API tests (they reload the seed, which resets Housekeeping data in
-   the database in `DATABASE_URL`, so use a development or test database):
-
-   ```bash
-   cd backend
-   npm test
-   ```
-
-### Sample accounts
-
-All passwords are `password123`. Staff sign in with their email (the
-username also works).
-
-| Email / username | Position    | Can do                                              |
-| ---------------- | ----------- | --------------------------------------------------- |
-| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules |
-| `hk.inspector`  | Inspector   | Inspect rooms, plus general housekeeping functions  |
-| `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks, requests, lost & found, maintenance |
-| `fo.desk`       | Front Office | Is denied at the Housekeeping login; uses the Front Office endpoints |
-| `eng.tech`      | Engineering  | Is denied at the Housekeeping login; uses the Engineering endpoints |
-
-## Flowchart to feature map
-
-| Flowchart step | Screen | API |
-| -------------- | ------ | --- |
-| Housekeeping Staff Log In / Authorized? / Access Denied | Login | `POST /api/auth/login` with `department: HOUSEKEEPING` |
-| Housekeeping Dashboard | Dashboard (status boxes, task bar chart, room status donut) | `GET /rooms`, `GET /tasks` |
-| Notification bell (every page) | Top bar | `GET /alerts` |
-| HK-001 View Room Status | Room Status | `GET /rooms` |
-| HK-002 Select Room | Room Status (right panel) | `GET /rooms/:id` |
-| HK-003 Update Room Status (logged) | Room Status | `PATCH /rooms/:id/status` |
-| Notify Front Office of Room Availability | Room Status, Overview | `GET /notifications` (created automatically on INSPECTED) |
-| HK-004 Create / Update Task | Cleaning Tasks | `POST /tasks`, `PATCH /tasks/:id` |
-| HK-005 Assign Housekeeper | Cleaning Tasks | `PATCH /tasks/:id` (`staffId`) |
-| HK-006 Perform Cleaning / Cleaning Completed? | Cleaning Tasks | `POST /tasks/:id/start`, `POST /tasks/:id/complete` |
-| HK-007 Inspect Room / Inspection Passed? | Room Inspection | `GET /tasks?status=`, `POST /inspections` |
-| Recent activity, inspection report (PDF / Excel) | Room Inspection | `GET /activity` (export runs in the browser) |
-| Mark CLEAN / INSPECTED or Return for Re-cleaning | Inspection | result `PASSED` or `FAILED` |
-| HK-008 View Staff Schedule | Schedules (calendar picker; housekeepers see their own shifts) | `GET /schedules?date=`, `GET /schedules/days?month=`, `GET /schedules/mine` |
-| HK-009 Create / Update Schedule, Assign Workload / Shift | Schedules | `POST /schedules`, `PATCH /schedules/:id` |
-| HK-010 Record Found Item, Store / Label Item | Lost & Found | `POST /lost-found` (label `LF-0001`) |
-| HK-011 Search / View Records | Lost & Found (click a record to open it; Export PDF / Excel) | `GET /lost-found?status=` |
-| Valid Claim? / HK-012 Release Item | Lost & Found | `POST /lost-found/:id/claims` |
-| HK-013 Record Request, Assign / Process | Guest Request (Status and Priority filters; Export PDF / Excel) | `GET /guest-requests?view=all`, `POST /guest-requests`, `PATCH /guest-requests/:id` |
-| HK-014 Complete Request | Guest Request | `POST /guest-requests/:id/complete` |
-| HK-015 Create Maintenance Request, Set Room OUT OF ORDER | Maintenance (Submit & Notify) | `POST /maintenance`, `GET /maintenance?view=all` |
-| Engineering Completes Repair | (Engineering) | `PATCH /maintenance/:id/status` (`status: REPAIRED`), ENGINEERING role |
-| Update Status / Create Cleaning Task | Maintenance | `POST /maintenance/:id/release` |
-
-All API paths above are under `/api/housekeeping` and need a JWT from a
-HOUSEKEEPING (or ADMIN) account, except the Engineering and Front Office
-endpoints listed below.
-
-## Endpoints for other departments
-
-| Department | Endpoint | Purpose |
-| ---------- | -------- | ------- |
-| Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
-| Front Office | `GET /api/housekeeping/notifications?unread=1` | "Room ready" notices raised when a room passes inspection |
-| Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
-| Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
-| Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` (REPAIRED lets Housekeeping release the room) |
-
-While the Engineering module does not exist yet, record a repair for a demo
-with the seeded `eng.tech` account (backend running):
-
-```bash
-cd backend
-npm run engineering -- list
-npm run engineering -- 1 REPAIRED
-```
-
-## Business rules
-
-* **Room status lifecycle.** By hand, Housekeeping can only set DIRTY or
-  CLEAN (see `MANUAL_TRANSITIONS` in `roomStatus.js`). CLEAN comes from
-  completing a task, INSPECTED only from a passed inspection, and OUT_OF_ORDER
-  only from a maintenance request. Front Office owns AVAILABLE, RESERVED and
-  OCCUPIED. A room leaves OUT_OF_ORDER only when its maintenance request is
-  released, and no task can be started, completed or inspected while it is out
-  of order. Every change is written to `hk_room_status_logs`.
-* **Cleaning tasks** go PENDING → ASSIGNED → IN_PROGRESS → COMPLETED →
-  INSPECTED. A failed inspection sets the task to RETURNED and the room back
-  to DIRTY; the same housekeeper cleans it again. A room can only have one open
-  task at a time.
-* **Who can do what.** Only supervisors create and assign tasks and
-  schedules. Only inspectors and supervisors record inspections. Only the
-  assigned housekeeper (or a supervisor) starts and completes a task.
-* **Lost & found.** An item is released only when the claimant's ID is
-  verified and their description matches; otherwise the claim is saved as
-  REJECTED and the item stays stored.
-* **Maintenance.** Reporting can set the room OUT_OF_ORDER (not while it is
-  OCCUPIED or RESERVED; Front Office moves the guest first). Only Engineering
-  marks the repair REPAIRED. Housekeeping then releases it: the room becomes
-  DIRTY and gets a high-priority cleaning task (a new POST_REPAIR task, or the
-  task that was open when the room went out of order, reopened).
+| File | What it is |
+| ---- | ---------- |
+| [`documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx`](documentation/HOSIS_Housekeeping_Subsystem_Complete_Documentation_2026_corrected.docx) | Current project document (updated November 12, 2026). It keeps the professor's required format and covers the implemented ERD, DFD, flowchart, UI screens, data dictionary, tests and user manual. Older versions stay in the same folder for reference. |
+| [`INTEGRATION.md`](INTEGRATION.md) | How to merge Housekeeping into the class HOSIS repository, endpoints for Front Office and Engineering, and decisions to confirm with the project manager |
+| [`REQUIREMENTS-MAPPING.md`](REQUIREMENTS-MAPPING.md) | How the class HK-001 to HK-011 requirements map to our flowchart codes HK-001 to HK-015 and to the code |
+| [`screenshots/`](screenshots/) | Screens taken from the running app with the sample data |
 
 ## UI revision (10/28/2026)
 
@@ -166,31 +31,19 @@ Changes asked for by the professor:
 * Maintenance: Status filter, button renamed to "Submit & Notify".
 
 The layout follows the Figma screens (HOSIS-UI-HOUSEKEEPING-UI): a sidebar
-with the eight Housekeeping functions, the hotel photo and logo on the login
-page, an Access Denied pop-up for unauthorized accounts, and an End session
-button with a confirmation pop-up. The logo and photo in
+with the Housekeeping functions, the hotel photo and logo on the login page,
+an Access Denied pop-up for unauthorized accounts, and an End session button
+with a confirmation pop-up. The logo and photo in
 `frontend/src/modules/housekeeping/assets/` were taken from the Figma design.
 
-PDF and Excel files are generated in the browser with `jspdf`,
-`jspdf-autotable` and `write-excel-file`.
+## Later additions
 
-## Notes for the other HOSIS groups
+* November 3-4, 2026: staff dashboard for housekeepers, Account, Personal
+  Record, Report Room, and phone layouts.
+* November 12, 2026: Inventory, Reports and Staff Accounts pages; lost and
+  found photos, QR labels, claim ID details and supervisor disposal; forgot
+  password; stricter room, inspection, guest request and schedule rules. See
+  "Added after the November 12, 2026 audit" in the main README.
 
-* Housekeeping tables use the `hk_` prefix so they never clash with other
-  departments' tables.
-* `06-housekeeping.sql` only creates `hk_` tables. The minimal `users`,
-  `rooms` and `guests` tables for running standalone are in
-  `database/standalone/00-shared-tables.sql`, which must not be loaded in the
-  combined HOSIS database.
-* `backend/src/app.js` mounts each subsystem's router
-  (`app.use('/api/<subsystem>', ...)`), so other groups can add theirs next to
-  `/api/housekeeping`.
-* The sidebar items for other departments are placeholders until their
-  modules exist.
-
-## Screenshots
-
-`docs/housekeeping/screenshots/` has screenshots of every screen taken from the
-running app with the sample data after the 10/28 UI revision, including the
-minimized menu, the notification bell, the Lost & Found and Guest Request
-pop-ups, a housekeeper's own schedule, Access Denied and End session.
+The Inventory, Reports and Staff Accounts pages were designed in the same
+style as the Figma screens; they are not in the Figma file yet.
