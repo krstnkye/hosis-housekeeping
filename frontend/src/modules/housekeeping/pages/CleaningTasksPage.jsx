@@ -23,7 +23,7 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
   const [flash, setFlash] = useState(null)
   const tasks = useLoad(() => api.tasks(mine ? '?mine=1' : ''), [mine])
   const workload = useLoad(() => api.workload(), [])
-  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff()]), [])
+  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff()]), [], { refresh: false })
   const isSupervisor = user.position === 'SUPERVISOR' || user.role === 'ADMIN'
 
   const query = (search || topSearch).toLowerCase()

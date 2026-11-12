@@ -21,7 +21,7 @@ const REPORT_COLUMNS = [
 ]
 
 // HK-013 Record Request -> Assign / Process Request -> HK-014 Complete Request.
-export default function GuestRequestsPage({ search: topSearch, headerActions }) {
+export default function GuestRequestsPage({ search: topSearch, headerActions, user }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
@@ -30,7 +30,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions }) 
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
   const requests = useLoad(() => api.guestRequests('?view=all'), [])
-  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff(), api.guests()]), [])
+  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff(), api.guests()]), [], { refresh: false })
 
   const query = (search || topSearch).toLowerCase()
   const list = (requests.data?.requests || []).filter(
@@ -54,6 +54,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions }) 
   }
 
   const formProps = lookups.data && {
+    user,
     rooms: lookups.data[0].rooms,
     staff: lookups.data[1].staff,
     guests: lookups.data[2].guests,
@@ -182,7 +183,11 @@ function CompletedRequest({ request }) {
   )
 }
 
-function RequestForm({ request, rooms, staff, guests, onSaved }) {
+function RequestForm({ request, rooms, staff: allStaff, guests, onSaved, user }) {
+  // Housekeepers take requests for themselves; supervisors and inspectors assign anyone.
+  const lead = user.role === 'ADMIN' || ['SUPERVISOR', 'INSPECTOR'].includes(user.position)
+  const staff = lead ? allStaff : allStaff.filter((s) => s.user_id === user.userId)
+  const othersRequest = Boolean(request?.staff_id && request.staff_id !== user.userId && !lead)
   const [form, setForm] = useState({
     roomId: request?.room_id || '',
     guestId: request?.guest_id || '',
@@ -241,11 +246,12 @@ function RequestForm({ request, rooms, staff, guests, onSaved }) {
           </select>
         </Field>
         <Field label="Request description" wide>
-          <textarea rows={2} value={form.details} onChange={set('details')} placeholder="e.g. Two extra towels and a toothbrush kit" />
+          <textarea rows={2} maxLength={255} value={form.details} onChange={set('details')} placeholder="e.g. Two extra towels and a toothbrush kit" />
         </Field>
         <Field label="Assigned staff" wide>
-          <select value={form.staffId} onChange={set('staffId')}>
+          <select value={form.staffId} onChange={set('staffId')} disabled={othersRequest}>
             <option value="">Not assigned</option>
+            {othersRequest && <option value={request.staff_id}>{request.assigned_to}</option>}
             {staff.map((s) => <option key={s.user_id} value={s.user_id}>{s.name}</option>)}
           </select>
         </Field>
@@ -261,12 +267,15 @@ function RequestForm({ request, rooms, staff, guests, onSaved }) {
           Delivery confirmed with the guest or by the staff member
         </label>
       )}
+      {othersRequest && (
+        <Notice tone="violet" title={`Assigned to ${request.assigned_to}`}>Only they or a supervisor can update or complete this request.</Notice>
+      )}
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
       <div className="hk-actions">
         <button
           type="button"
           className="hk-btn hk-btn--primary"
-          disabled={busy || !form.roomId || !form.details}
+          disabled={busy || !form.roomId || !form.details || othersRequest}
           onClick={() =>
             request
               ? run(() => api.updateGuestRequest(request.request_id, payload), 'Request updated.')
@@ -279,7 +288,7 @@ function RequestForm({ request, rooms, staff, guests, onSaved }) {
           <button
             type="button"
             className="hk-btn hk-btn--secondary"
-            disabled={busy || !confirmed}
+            disabled={busy || !confirmed || othersRequest}
             onClick={() => run(() => api.completeGuestRequest(request.request_id, { completionNotes }), `Request for room ${request.room_number} completed.`)}
           >
             Complete request

@@ -7,8 +7,8 @@ import { useLoad } from '../useLoad.js'
 const MIN_PASSWORD = 8
 
 // Account: the signed-in staff member's user ID, email and password.
-export default function AccountPage() {
-  const { data, error, loading } = useLoad(() => api.account(), [])
+export default function AccountPage({ onSessionChange }) {
+  const { data, error, loading } = useLoad(() => api.account(), [], { refresh: false })
   if (!data) return <LoadState loading={loading} error={error} />
   const a = data.account
 
@@ -45,12 +45,13 @@ export default function AccountPage() {
         </Notice>
       </Card>
 
-      <PasswordForm />
+      <PasswordForm onChanged={(res) => onSessionChange?.({ token: res.token, user: res.user })} />
     </div>
   )
 }
 
-function PasswordForm() {
+// Also used on its own when a temporary password must be replaced.
+export function PasswordForm({ onChanged, currentLabel = 'Current password' }) {
   const empty = { currentPassword: '', newPassword: '', confirm: '' }
   const [form, setForm] = useState(empty)
   const [show, setShow] = useState(false)
@@ -68,9 +69,11 @@ function PasswordForm() {
     setBusy(true)
     setMessage(null)
     try {
-      await api.changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword })
+      const res = await api.changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword })
       setForm(empty)
-      setMessage({ tone: 'green', title: 'Password changed', text: 'Use your new password the next time you sign in.' })
+      setMessage({ tone: 'green', title: 'Password changed', text: 'Use your new password the next time you sign in. Other devices signed in with the old password are signed out.' })
+      // The old token no longer works; keep this device signed in with the new one.
+      onChanged?.(res)
     } catch (err) {
       setMessage({ tone: 'red', title: 'Password not changed', text: err.message })
     } finally {
@@ -82,7 +85,7 @@ function PasswordForm() {
   return (
     <Card title="Change password" subtitle="Keep your account private; never share your password">
       <form className="hk-stack" onSubmit={save}>
-        <Field label="Current password">
+        <Field label={currentLabel}>
           <input type={type} value={form.currentPassword} onChange={set('currentPassword')} autoComplete="current-password" />
         </Field>
         <Field label="New password">

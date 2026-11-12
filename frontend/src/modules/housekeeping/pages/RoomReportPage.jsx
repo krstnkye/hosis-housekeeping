@@ -34,7 +34,7 @@ const EMPTY = {
 // Report Room Condition: a staff member tells Front Office (room condition
 // notice) and/or Maintenance (repair request for Engineering) about a room.
 export default function RoomReportPage() {
-  const rooms = useLoad(() => api.rooms(), [])
+  const rooms = useLoad(() => api.rooms(), [], { refresh: false })
   const reports = useLoad(() => api.myReports(), [])
   const [form, setForm] = useState(EMPTY)
   const [busy, setBusy] = useState(false)

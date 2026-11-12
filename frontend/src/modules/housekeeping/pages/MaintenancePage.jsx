@@ -32,7 +32,7 @@ export default function MaintenancePage() {
   const [flash, setFlash] = useState(null)
   const [status, setStatus] = useState('')
   const issues = useLoad(() => api.maintenance('?view=all'), [])
-  const rooms = useLoad(() => api.rooms(), [])
+  const rooms = useLoad(() => api.rooms(), [], { refresh: false })
 
   const all = issues.data?.requests || []
   const list = all.filter((r) => (status ? r.status === status : r.status !== 'CLOSED'))

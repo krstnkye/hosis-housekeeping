@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { clearSession, getSession, setExternalSession, setUnauthorizedHandler } from './api.js'
+import { clearSession, getSession, replaceSession, setExternalSession, setUnauthorizedHandler } from './api.js'
 import { PageHeader, Sidebar, Topbar } from './components/Layout.jsx'
-import { STAFF_TABS, TABS } from './tabs.js'
+import { STAFF_TABS, TABS, TAB_POSITIONS } from './tabs.js'
 import LoginPage from './pages/LoginPage.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
 import StaffDashboardPage from './pages/StaffDashboardPage.jsx'
@@ -11,7 +11,10 @@ import InspectionPage from './pages/InspectionPage.jsx'
 import SchedulesPage from './pages/SchedulesPage.jsx'
 import RoomReportPage from './pages/RoomReportPage.jsx'
 import PersonalRecordPage from './pages/PersonalRecordPage.jsx'
-import AccountPage from './pages/AccountPage.jsx'
+import AccountPage, { PasswordForm } from './pages/AccountPage.jsx'
+import InventoryPage from './pages/InventoryPage.jsx'
+import ReportsPage from './pages/ReportsPage.jsx'
+import StaffAccountsPage from './pages/StaffAccountsPage.jsx'
 import LostFoundPage from './pages/LostFoundPage.jsx'
 import GuestRequestsPage from './pages/GuestRequestsPage.jsx'
 import MaintenancePage from './pages/MaintenancePage.jsx'
@@ -28,6 +31,11 @@ const PAGES = {
   'lost-found': { component: LostFoundPage, title: 'LOST & FOUND', subtitle: 'Record, store and return found belongings with verified claims.' },
   requests: { component: GuestRequestsPage, title: 'Guest Request', subtitle: 'Assign and resolve guest needs without losing track of open work.' },
   maintenance: { component: MaintenancePage, title: 'Maintenance', subtitle: 'Report defects, coordinate with Engineering and protect room readiness.' },
+  inventory: { component: InventoryPage, title: 'Inventory', subtitle: 'Linen, guest amenities and cleaning supplies on hand.' },
+  reports: { component: ReportsPage, title: 'Reports', subtitle: 'Housekeeping performance and history for any date range.' },
+  'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Forgotten passwords and temporary passwords for your team.' },
+  record: { component: PersonalRecordPage, title: 'Personal Record', subtitle: 'Your work history, inspection results and reports.' },
+  account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 
 // What regular housekeeping staff see in place of the supervisor pages, and
@@ -40,8 +48,15 @@ const STAFF_PAGES = {
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 const ALL_TABS = [...TABS, ...STAFF_TABS]
-const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'record', 'account']
+const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'inventory', 'record', 'account']
   .map((id) => ALL_TABS.find((t) => t.id === id))
+// Supervisors and inspectors: the full Housekeeping menu plus their own
+// record and account.
+const LEAD_MENU = [...TABS, ...STAFF_TABS.filter((t) => t.id !== 'report')]
+
+function leadMenu(user) {
+  return LEAD_MENU.filter((t) => !TAB_POSITIONS[t.id] || TAB_POSITIONS[t.id].includes(user.position) || user.role === 'ADMIN')
+}
 
 function currentTab() {
   const id = window.location.hash.replace('#/housekeeping/', '')
@@ -111,6 +126,21 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     return <LoginPage onLogin={setSession} />
   }
 
+  function updateSession(next) {
+    if (shellSession) return
+    replaceSession(next)
+    setSession(next)
+  }
+
+  function logout() {
+    if (shellLogout) {
+      shellLogout()
+      return
+    }
+    clearSession()
+    setSession(null)
+  }
+
   if (!ALLOWED_ROLES.includes(session.user.role)) {
     return (
       <div className="hk-app">
@@ -121,9 +151,28 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     )
   }
 
+  // A temporary password set by the supervisor must be replaced first.
+  if (session.user.mustChangePassword) {
+    return (
+      <div className="hk-app hk-app--plain">
+        <main className="hk-content hk-content--narrow">
+          <PageHeader
+            title="Choose a new password"
+            subtitle="Your supervisor gave you a temporary password. Choose your own before you continue."
+            actions={<button type="button" className="hk-btn hk-btn--secondary" onClick={logout}>Sign out</button>}
+          />
+          <PasswordForm
+            currentLabel="Temporary password"
+            onChanged={(res) => updateSession({ token: res.token, user: res.user })}
+          />
+        </main>
+      </div>
+    )
+  }
+
   // Housekeepers (regular staff) get the staff dashboard and staff menu.
   const staff = session.user.position === 'HOUSEKEEPER'
-  const tabs = staff ? STAFF_MENU : TABS
+  const tabs = staff ? STAFF_MENU : leadMenu(session.user)
   const activeTab = tabs.some((t) => t.id === tab) ? tab : 'overview'
   const page = (staff && STAFF_PAGES[activeTab]) || PAGES[activeTab]
   const Page = page.component
@@ -153,18 +202,11 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
           user={session.user}
           onMenu={mobile ? () => setMenuOpen(true) : null}
           menuOpen={mobile && menuOpen}
-          onLogout={() => {
-            if (shellLogout) {
-              shellLogout()
-              return
-            }
-            clearSession()
-            setSession(null)
-          }}
+          onLogout={logout}
         />
         <main className="hk-content">
           <PageHeader title={page.title} subtitle={page.subtitle} actions={<span className="hk-actions" ref={setHeaderActions} />} />
-          <Page key={activeTab} user={session.user} search="" headerActions={headerActions} />
+          <Page key={activeTab} user={session.user} search="" headerActions={headerActions} onSessionChange={updateSession} />
         </main>
         <footer className="hk-footer">
           <span>Grand Horizon Hotel · Housekeeping operations</span>

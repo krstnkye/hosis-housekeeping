@@ -2873,3 +2873,243 @@ body.hk-no-scroll {
     gap: 10px 16px;
   }
 }
+
+/* ---------- November 2026 additions: inventory, reports, staff accounts,
+   lost-and-found photos and labels, forgot password ---------- */
+
+.hk-btn--small {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+.hk-btn--danger {
+  background: #c62f2f;
+  color: #fff;
+}
+
+.hk-btn--danger:not(:disabled):hover {
+  background: #a82424;
+}
+
+.hk-actions--tight {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hk-actions--left {
+  justify-content: flex-start;
+}
+
+.hk-toolbar--wrap {
+  align-items: flex-end;
+  margin-bottom: 10px;
+}
+
+.hk-form--inline {
+  grid-template-columns: repeat(2, minmax(140px, 180px));
+}
+
+/* Plain page (no menu) used for "Choose a new password". */
+.hk-app--plain {
+  display: block;
+  background: var(--hk-cream);
+}
+
+.hk-content--narrow {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.hk-login__forgot-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.hk-temp-password {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--hk-navy);
+  background: #fff;
+  border: 1px dashed var(--hk-gold-dark);
+  border-radius: 6px;
+  padding: 8px 14px;
+  display: inline-block;
+  margin: 6px 0;
+  user-select: all;
+}
+
+/* Inventory stock level: number plus a small bar against twice the reorder level. */
+.hk-stock {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 90px;
+}
+
+.hk-stock__bar {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--hk-line);
+  overflow: hidden;
+}
+
+.hk-stock__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.hk-stock__bar--green span { background: #2f9e5b; }
+.hk-stock__bar--amber span { background: var(--hk-gold); }
+.hk-stock__bar--red span { background: #d83a3a; }
+
+.hk-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hk-feed li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hk-line);
+  font-size: 0.88rem;
+}
+
+.hk-feed li:last-child {
+  border-bottom: 0;
+}
+
+/* Lost & found photos */
+.hk-photos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.hk-photos__item {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--hk-line);
+  background: var(--hk-lavender);
+  display: block;
+}
+
+.hk-photos__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hk-photo-preview {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--hk-line);
+  margin-top: 8px;
+}
+
+/* Lost & found storage label with QR code */
+.hk-print-label {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 2px solid var(--hk-navy);
+  border-radius: 8px;
+  background: #fff;
+  max-width: 460px;
+}
+
+.hk-print-label img {
+  width: 132px;
+  height: 132px;
+  flex: none;
+}
+
+.hk-print-label__qr-wait {
+  width: 132px;
+  height: 132px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--hk-muted);
+}
+
+.hk-print-label > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hk-print-label__code {
+  font-size: 1.6rem;
+  letter-spacing: 0.04em;
+  color: var(--hk-navy);
+}
+
+.hk-print-label small {
+  color: var(--hk-muted);
+}
+
+@media (max-width: 520px) {
+  .hk-print-label {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hk-form--inline {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* When printing a label, only the label is printed. */
+@media print {
+  body.hk-printing-label * {
+    visibility: hidden;
+  }
+
+  body.hk-printing-label .hk-print-label,
+  body.hk-printing-label .hk-print-label * {
+    visibility: visible;
+  }
+
+  body.hk-printing-label .hk-print-label {
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+}
+
+/* The supervisor menu has 13 items; on laptop-height screens the items are a
+   little tighter so the whole menu fits without scrolling. */
+@media (min-width: 861px) and (max-height: 1000px) {
+  .hk-sidebar:not(.is-drawer) .hk-nav {
+    gap: 7px;
+  }
+
+  .hk-sidebar:not(.is-drawer) .hk-nav__item {
+    padding: 8px 18px;
+    font-size: 1rem;
+  }
+
+  .hk-sidebar:not(.is-drawer) .hk-brand {
+    padding-bottom: 10px;
+  }
+}
+
+.hk-page-head .hk-btn {
+  white-space: nowrap;
+}

@@ -125,7 +125,8 @@ export default function InspectionPage({ user }) {
           key={selected.task_id}
           task={selected}
           user={user}
-          canInspect={canInspect}
+          canInspect={canInspect && selected.staff_id !== user.userId}
+          ownWork={selected.staff_id === user.userId}
           onDone={(msg) => {
             setFlash(msg)
             setSelectedId(null)
@@ -164,7 +165,7 @@ function InspectionHistory({ task }) {
   )
 }
 
-function InspectionForm({ task, user, canInspect, onDone }) {
+function InspectionForm({ task, user, canInspect, ownWork, onDone }) {
   const [checks, setChecks] = useState(Object.fromEntries(CHECKLIST.map((c) => [c.id, false])))
   const [remarks, setRemarks] = useState('')
   const [message, setMessage] = useState(null)
@@ -219,7 +220,8 @@ function InspectionForm({ task, user, canInspect, onDone }) {
         <textarea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} disabled={!canInspect} />
       </Field>
 
-      {!canInspect && <Notice tone="amber" title="Inspectors only">Only inspectors and supervisors can record inspection results.</Notice>}
+      {ownWork && <Notice tone="amber" title="You cleaned this room">Another inspector or supervisor must inspect it.</Notice>}
+      {!canInspect && !ownWork && <Notice tone="amber" title="Inspectors only">Only inspectors and supervisors can record inspection results.</Notice>}
       {canInspect && allChecked && (
         <Notice tone="green" title="Pass: INSPECTED → Front Office notified">
           All checklist items met. Passing marks the room INSPECTED and tells Front Office it is ready.
