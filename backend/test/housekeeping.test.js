@@ -546,7 +546,10 @@ test('input: bad values get a clear 400, not a server error', async () => {
     body: { roomId: await roomId('101'), taskType: 'TOUCH_UP', dueTime: 'banana' },
   });
   assert.equal(badTime.status, 400);
-  const badDay = await api('GET', '/housekeeping/reports/summary?from=2026-02-30', { token: sup.token });
+  const badDay = await api('POST', '/housekeeping/schedules', {
+    token: sup.token,
+    body: { staffId: sup.user.userId, shiftDate: '2027-02-30', shift: 'MORNING', startTime: '06:00', endTime: '14:00', assignedArea: 'Floor 1' },
+  });
   assert.equal(badDay.status, 400);
   const res = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad json' });
   assert.equal(res.status, 400);
@@ -728,20 +731,39 @@ test('inventory: stock in and out, no negative stock, supervisor-only counts', a
   assert.ok(alerts.body.alerts.some((a) => a.type === 'STOCK'));
 });
 
-test('reports: summary and history for a date range', async () => {
-  const sup = await login('hk.supervisor');
+test('guest request stock: approve takes the items out of inventory once', async () => {
+  const joy = await login('hk.joy');
   const liza = await login('hk.liza');
-  assert.equal((await api('GET', '/housekeeping/reports/summary', { token: liza.token })).status, 403);
-  const summary = await api('GET', '/housekeeping/reports/summary', { token: sup.token });
-  assert.equal(summary.status, 200);
-  assert.equal(summary.body.daily.length, 7);
-  assert.ok(summary.body.totals.tasks_completed >= 5);
-  assert.ok(summary.body.totals.inspections_failed >= 1);
-  assert.ok(summary.body.staff.some((s) => s.name === 'Liza Cruz' && s.tasks_completed >= 1));
-  const history = await api('GET', '/housekeeping/reports/history?type=inspections&search=303', { token: sup.token });
-  assert.equal(history.status, 200);
-  assert.ok(history.body.rows.length >= 2);
-  assert.equal((await api('GET', '/housekeeping/reports/summary?from=2026-01-01&to=2026-12-31', { token: sup.token })).status, 400);
+  const items = (await api('GET', '/housekeeping/inventory', { token: joy.token })).body.items;
+  const towel = items.find((i) => i.item_name === 'Bath towel');
+  const created = await api('POST', '/housekeeping/guest-requests', {
+    token: joy.token,
+    body: { roomId: await roomId('104'), requestType: 'TOWELS', details: 'Two bath towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 2 },
+  });
+  assert.equal(created.status, 201);
+  const id = created.body.request.request_id;
+  const listed = (await api('GET', '/housekeeping/guest-requests?view=all', { token: joy.token })).body.requests.find((r) => r.request_id === id);
+  assert.equal(listed.item_name, 'Bath towel');
+  assert.equal(listed.on_hand, towel.quantity);
+
+  assert.equal((await api('POST', `/housekeeping/guest-requests/${id}/approve-stock`, { token: liza.token })).status, 403);
+  const approved = await api('POST', `/housekeeping/guest-requests/${id}/approve-stock`, { token: joy.token });
+  assert.equal(approved.status, 200);
+  assert.ok(approved.body.request.stock_approved_at);
+  const after = (await api('GET', '/housekeeping/inventory', { token: joy.token })).body.items.find((i) => i.item_name === 'Bath towel');
+  assert.equal(after.quantity, towel.quantity - 2);
+  const moves = await api('GET', `/housekeeping/inventory/movements?itemId=${towel.inv_item_id}`, { token: joy.token });
+  assert.equal(moves.body.movements[0].remarks, `Guest request GR-${id}`);
+  assert.equal((await api('POST', `/housekeeping/guest-requests/${id}/approve-stock`, { token: joy.token })).status, 409);
+  assert.equal((await api('PATCH', `/housekeeping/guest-requests/${id}`, { token: joy.token, body: { quantity: 5 } })).status, 409);
+
+  const tooMany = await api('POST', '/housekeeping/guest-requests', {
+    token: joy.token,
+    body: { roomId: await roomId('104'), requestType: 'TOWELS', details: 'Lots of towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 999 },
+  });
+  assert.equal((await api('POST', `/housekeeping/guest-requests/${tooMany.body.request.request_id}/approve-stock`, { token: joy.token })).status, 409);
+  await api('POST', `/housekeeping/guest-requests/${tooMany.body.request.request_id}/complete`, { token: joy.token, body: {} });
+  await api('POST', `/housekeeping/guest-requests/${id}/complete`, { token: joy.token, body: {} });
 });
 
 test('front office stand-ins: release an inspected room and check a guest in', async () => {

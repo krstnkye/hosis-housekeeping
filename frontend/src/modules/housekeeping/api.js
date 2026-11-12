@@ -98,14 +98,9 @@ export const api = {
   resetStaffPassword: (userId) => request('POST', `${HK}/password-resets/staff/${userId}`),
   dismissReset: (id) => request('POST', `${HK}/password-resets/${id}/dismiss`),
 
-  reportSummary: (from, to) => request('GET', `${HK}/reports/summary?from=${from}&to=${to}`),
-  reportHistory: (type, from, to) => request('GET', `${HK}/reports/history?type=${type}&from=${from}&to=${to}`),
 
   inventory: (q = '') => request('GET', `${HK}/inventory${q}`),
-  inventoryMovements: (q = '') => request('GET', `${HK}/inventory/movements${q}`),
-  createInventoryItem: (body) => request('POST', `${HK}/inventory`, body),
-  updateInventoryItem: (id, body) => request('PATCH', `${HK}/inventory/${id}`, body),
-  moveStock: (id, body) => request('POST', `${HK}/inventory/${id}/movements`, body),
+  approveRequestStock: (id) => request('POST', `${HK}/guest-requests/${id}/approve-stock`),
 
   dashboard: () => request('GET', `${HK}/dashboard`),
   staff: () => request('GET', `${HK}/staff`),

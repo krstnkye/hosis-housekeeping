@@ -12,8 +12,6 @@ import SchedulesPage from './pages/SchedulesPage.jsx'
 import RoomReportPage from './pages/RoomReportPage.jsx'
 import PersonalRecordPage from './pages/PersonalRecordPage.jsx'
 import AccountPage, { PasswordForm } from './pages/AccountPage.jsx'
-import InventoryPage from './pages/InventoryPage.jsx'
-import ReportsPage from './pages/ReportsPage.jsx'
 import StaffAccountsPage from './pages/StaffAccountsPage.jsx'
 import LostFoundPage from './pages/LostFoundPage.jsx'
 import GuestRequestsPage from './pages/GuestRequestsPage.jsx'
@@ -31,8 +29,6 @@ const PAGES = {
   'lost-found': { component: LostFoundPage, title: 'LOST & FOUND', subtitle: 'Record, store and return found belongings with verified claims.' },
   requests: { component: GuestRequestsPage, title: 'Guest Request', subtitle: 'Assign and resolve guest needs without losing track of open work.' },
   maintenance: { component: MaintenancePage, title: 'Maintenance', subtitle: 'Report defects, coordinate with Engineering and protect room readiness.' },
-  inventory: { component: InventoryPage, title: 'Inventory', subtitle: 'Linen, guest amenities and cleaning supplies on hand.' },
-  reports: { component: ReportsPage, title: 'Reports', subtitle: 'Housekeeping performance and history for any date range.' },
   'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Forgotten passwords and temporary passwords for your team.' },
   record: { component: PersonalRecordPage, title: 'Personal Record', subtitle: 'Your work history, inspection results and reports.' },
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
@@ -48,7 +44,7 @@ const STAFF_PAGES = {
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 const ALL_TABS = [...TABS, ...STAFF_TABS]
-const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'inventory', 'record', 'account']
+const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'record', 'account']
   .map((id) => ALL_TABS.find((t) => t.id === id))
 // Supervisors and inspectors: the full Housekeeping menu plus their own
 // record and account.

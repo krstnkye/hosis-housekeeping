@@ -60,9 +60,9 @@ username also works).
 
 | Email / username | Position    | Can do                                              |
 | ---------------- | ----------- | --------------------------------------------------- |
-| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules, reports, inventory counts, disposing found items, and resetting staff passwords |
-| `hk.inspector`  | Inspector   | Inspect rooms (not ones they cleaned), reports, plus general housekeeping functions |
-| `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks and requests, lost & found, maintenance, room reports, stock in/out |
+| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules, disposing found items, and resetting staff passwords |
+| `hk.inspector`  | Inspector   | Inspect rooms (not ones they cleaned), plus general housekeeping functions |
+| `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks and requests, lost & found, maintenance, room reports, approving stock for their guest requests |
 | `fo.desk`       | Front Office | Is denied at the Housekeeping login; uses the Front Office endpoints |
 | `eng.tech`      | Engineering  | Is denied at the Housekeeping login; uses the Engineering endpoints |
 
@@ -101,8 +101,8 @@ The sample data also has one waiting "Forgot password" request (from
 | HK-015 Create Maintenance Request, Set Room OUT OF ORDER | Maintenance | `POST /maintenance` |
 | Engineering Completes Repair | (Engineering) | `PATCH /maintenance/:id/status` (`status: REPAIRED`), ENGINEERING role |
 | Update Status / Create Cleaning Task | Maintenance | `POST /maintenance/:id/release` |
-| Linen, amenity and supply stock | Inventory | `GET /inventory`, `POST /inventory` (supervisor), `PATCH /inventory/:id` (supervisor), `POST /inventory/:id/movements`, `GET /inventory/movements` |
-| Performance and history | Reports (supervisor, inspector) | `GET /reports/summary?from=&to=`, `GET /reports/history?type=` (`tasks`, `inspections` or `status`) |
+| Inventory stock for a guest request (Figma: Guest Request details) | Guest Requests (Inventory stock card, Approve request) | `POST /guest-requests` and `PATCH /guest-requests/:id` with `{ invItemId, quantity }`, `POST /guest-requests/:id/approve-stock` |
+| Stock list (no page; API only) | none | `GET /inventory`, `POST /inventory` (supervisor), `PATCH /inventory/:id` (supervisor), `POST /inventory/:id/movements`, `GET /inventory/movements` |
 
 All API paths above are under `/api/housekeeping` and need a JWT from a
 HOUSEKEEPING (or ADMIN) account, except the Engineering and Front Office
@@ -175,11 +175,16 @@ npm run frontoffice -- checkout 203     # OCCUPIED -> DIRTY + cleaning task
   supervisor can dispose of an item, and must give a reason, which is kept with
   their name and the date. An item can have up to 3 photos (JPEG, PNG or WebP,
   2 MB each; the browser shrinks them before upload).
-* **Inventory.** Every stock change is a movement (IN, OUT or ADJUST) with the
-  balance after it. Stock cannot go below zero. Any housekeeping staff member
-  records stock in and out; only supervisors add items, change reorder levels
-  and record stock counts (ADJUST, with a reason). Items at or below their
-  reorder level appear in the supervisor's notifications.
+* **Inventory stock on guest requests.** Following the Figma Guest Request
+  screen, a request can name a stock item and quantity (e.g. 2 bath towels).
+  The details show the Inventory stock card (on hand, available) and
+  Approve request, which takes the stock out once, as an OUT movement for the
+  room. The assigned staff member or a supervisor/inspector approves; it is
+  refused if there is not enough stock. There is no Inventory page because
+  the Figma has none: items and counts come from the seed or the
+  `/inventory` API. Every stock change is a movement with the balance after
+  it, stock cannot go below zero, and items at or below their reorder level
+  appear in the supervisor's notifications.
 * **Sign-in and passwords.** After 5 wrong passwords for the same account from
   the same address, sign-in is locked for 15 minutes; failures are stored in
   `hk_login_failures`, so a restart does not clear them. Each request re-checks
@@ -222,8 +227,7 @@ npm run frontoffice -- checkout 203     # OCCUPIED -> DIRTY + cleaning task
 | Guest Requests | Housekeepers cannot take over or close someone else's request |
 | Schedules | No overlapping shifts; no shifts in the past |
 | Lost & Found | Photos, printable QR storage label, ID type and number on claims, supervisor-only disposal with a reason |
-| Inventory (new page) | Linen, amenities and cleaning supplies: stock in/out, stock counts, low-stock alerts, export |
-| Reports (new page) | Totals, rooms cleaned per day, staff performance and history for any range up to 92 days, with PDF/Excel export |
+| Guest Requests | Inventory stock card and Approve request from the Figma design; stock is taken out of inventory once approved |
 | Staff Accounts (new page) | Forgot-password requests and temporary passwords (supervisors) |
 | Account and My Record | Now also for supervisors and inspectors |
 | Sign-in | Lockout survives a restart; sessions end when the password changes or the account is deactivated |

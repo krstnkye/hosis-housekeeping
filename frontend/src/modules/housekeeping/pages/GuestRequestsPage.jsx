@@ -30,7 +30,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
   const requests = useLoad(() => api.guestRequests('?view=all'), [])
-  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff(), api.guests()]), [], { refresh: false })
+  const lookups = useLoad(() => Promise.all([api.rooms(), api.staff(), api.guests(), api.inventory()]), [], { refresh: false })
 
   const query = (search || topSearch).toLowerCase()
   const list = (requests.data?.requests || []).filter(
@@ -58,6 +58,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
     rooms: lookups.data[0].rooms,
     staff: lookups.data[1].staff,
     guests: lookups.data[2].guests,
+    items: lookups.data[3].items,
     onSaved: refresh,
   }
 
@@ -121,6 +122,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
                 <dt>Priority</dt><dd>{label(selected.priority)}</dd>
                 <dt>Assigned</dt><dd>{selected.assigned_to?.trim() || 'Unassigned'}</dd>
               </dl>
+              <StockCard request={selected} user={user} onDone={refresh} />
               {!selected.staff_id && selected.request_status !== 'COMPLETED' && (
                 <Notice tone="amber" title="Awaiting assignment">Assign a staff member before the request can be completed.</Notice>
               )}
@@ -168,6 +170,63 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
   )
 }
 
+function canWork(user, request) {
+  const lead = user.role === 'ADMIN' || ['SUPERVISOR', 'INSPECTOR'].includes(user.position)
+  return lead || request.staff_id === user.userId
+}
+
+// Figma "Inventory stock" card: the item the guest asked for, how many are on
+// hand, and Approve request, which takes the stock out of inventory.
+export function StockCard({ request, user, onDone }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  if (!request.inv_item_id) return null
+  const approved = Boolean(request.stock_approved_at)
+  const enough = request.on_hand >= request.quantity_requested
+  const low = request.on_hand - (approved ? 0 : request.quantity_requested) <= request.reorder_level
+  const badge = approved ? ['INSPECTED', 'Approved'] : !enough ? ['OUT_OF_ORDER', 'Not enough'] : low ? ['DIRTY', 'Low stock'] : ['CLEAN', 'In stock']
+  const allowed = canWork(user, request) && request.request_status !== 'COMPLETED'
+
+  async function approve() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.approveRequestStock(request.request_id)
+      onDone({ tone: 'green', title: `${request.quantity_requested} ${request.unit} of ${request.item_name} approved for room ${request.room_number}.` })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="hk-stock-card">
+      <span className="hk-stock-card__label">Inventory stock</span>
+      <div className="hk-stock-card__box">
+        <div className="hk-stock-card__head">
+          <span>
+            <strong>{request.item_name}</strong>
+            <small className="hk-block">{label(request.item_category)} stock {approved ? 'taken' : 'available'} for Room {request.room_number} request</small>
+          </span>
+          <Badge value={badge[0]}>{badge[1]}</Badge>
+        </div>
+        <dl className="hk-stock-card__metrics">
+          <div><dt>Quantity requested</dt><dd>{request.quantity_requested}</dd></div>
+          <div><dt>On hand</dt><dd>{request.on_hand}</dd></div>
+          <div><dt>{approved ? 'Approved' : 'Available'}</dt><dd>{approved ? formatDateTime(request.stock_approved_at) : enough ? 'Yes' : 'No'}</dd></div>
+        </dl>
+        {!approved && allowed && (
+          <button type="button" className="hk-btn hk-btn--primary hk-btn--block" disabled={busy || !enough} onClick={approve}>
+            Approve request
+          </button>
+        )}
+        {error && <Notice tone="red" title="Not approved">{error}</Notice>}
+      </div>
+    </div>
+  )
+}
+
 function CompletedRequest({ request }) {
   return (
     <Card title={`Request details · Room ${request.room_number}`} subtitle={`Requested ${formatDateTime(request.requested_at)}`}>
@@ -183,7 +242,7 @@ function CompletedRequest({ request }) {
   )
 }
 
-function RequestForm({ request, rooms, staff: allStaff, guests, onSaved, user }) {
+function RequestForm({ request, rooms, staff: allStaff, guests, items, onSaved, user }) {
   // Housekeepers take requests for themselves; supervisors and inspectors assign anyone.
   const lead = user.role === 'ADMIN' || ['SUPERVISOR', 'INSPECTOR'].includes(user.position)
   const staff = lead ? allStaff : allStaff.filter((s) => s.user_id === user.userId)
@@ -195,13 +254,22 @@ function RequestForm({ request, rooms, staff: allStaff, guests, onSaved, user })
     priority: request?.priority || 'NORMAL',
     details: request?.request_details || '',
     staffId: request?.staff_id || '',
+    invItemId: request?.inv_item_id || '',
+    quantity: request?.quantity_requested || 1,
   })
   const [completionNotes, setCompletionNotes] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
-  const payload = { ...form, guestId: form.guestId || null, staffId: form.staffId || null }
+  const payload = {
+    ...form,
+    guestId: form.guestId || null,
+    staffId: form.staffId || null,
+    invItemId: form.invItemId || null,
+    quantity: form.invItemId ? form.quantity : undefined,
+  }
+  const stockLocked = Boolean(request?.stock_approved_at)
 
   async function run(action, msg) {
     setBusy(true)
@@ -248,6 +316,15 @@ function RequestForm({ request, rooms, staff: allStaff, guests, onSaved, user })
         <Field label="Request description" wide>
           <textarea rows={2} maxLength={255} value={form.details} onChange={set('details')} placeholder="e.g. Two extra towels and a toothbrush kit" />
         </Field>
+        <Field label="Item from stock">
+          <select value={form.invItemId} onChange={set('invItemId')} disabled={stockLocked}>
+            <option value="">No stock needed</option>
+            {items.map((i) => <option key={i.inv_item_id} value={i.inv_item_id}>{i.item_name} · {i.quantity} {i.unit} on hand</option>)}
+          </select>
+        </Field>
+        <Field label="Quantity requested">
+          <input type="number" min={1} max={999} value={form.quantity} onChange={set('quantity')} disabled={!form.invItemId || stockLocked} />
+        </Field>
         <Field label="Assigned staff" wide>
           <select value={form.staffId} onChange={set('staffId')} disabled={othersRequest}>
             <option value="">Not assigned</option>
@@ -261,6 +338,7 @@ function RequestForm({ request, rooms, staff: allStaff, guests, onSaved, user })
           </Field>
         )}
       </div>
+      {request && <StockCard request={request} user={user} onDone={onSaved} />}
       {request && (
         <label className="hk-check">
           <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />

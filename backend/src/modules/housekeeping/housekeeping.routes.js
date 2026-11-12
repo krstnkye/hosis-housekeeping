@@ -65,7 +65,7 @@ router.get('/alerts', async (req, res) => {
        UNION ALL
        SELECT 'STOCK', CONCAT(i.item_name, ' is low: ', i.quantity, ' ', i.unit, ' left (reorder at ', i.reorder_level, ')'),
               COALESCE((SELECT MAX(m.moved_at) FROM hk_inventory_movements m WHERE m.inv_item_id = i.inv_item_id), i.created_at),
-              'inventory'
+              'requests'
          FROM hk_inventory_items i
         WHERE i.active AND i.quantity <= i.reorder_level AND $3
        UNION ALL
@@ -123,7 +123,6 @@ router.use('/guest-requests', require('./guestRequests.routes'));
 router.use('/lost-found', require('./lostFound.routes'));
 router.use('/maintenance', require('./maintenance.routes'));
 router.use('/inventory', require('./inventory.routes'));
-router.use('/reports', require('./reports.routes'));
 router.use('/password-resets', require('./passwordResets.routes'));
 router.use(require('./me.routes'));
 

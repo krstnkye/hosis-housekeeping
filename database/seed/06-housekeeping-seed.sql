@@ -19,6 +19,10 @@
 -- Dates are relative to CURRENT_DATE so the demo always looks current.
 -- =====================================================================
 
+-- Same time zone as the backend (DB_TIME_ZONE), so sample times loaded with
+-- psql line up with times the app records. Change it if DB_TIME_ZONE differs.
+SET TIME ZONE 'Asia/Manila';
+
 TRUNCATE hk_inventory_movements, hk_inventory_items, hk_password_must_change,
          hk_password_resets, hk_login_failures, hk_lost_found_photos,
          hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
@@ -179,6 +183,14 @@ FROM (VALUES
 JOIN hk_inventory_items i ON i.item_name = m.item_name
 JOIN users u ON u.username = m.username
 LEFT JOIN rooms r ON r.room_number = m.room_number;
+
+-- Guest requests that take items from stock (the Inventory stock card).
+UPDATE hk_guest_requests q
+   SET inv_item_id = i.inv_item_id, quantity_requested = x.qty
+  FROM (VALUES ('102', 'Bath towel', 2), ('202', 'Toothbrush kit', 1)) AS x(room_number, item_name, qty)
+  JOIN hk_inventory_items i ON i.item_name = x.item_name
+  JOIN rooms r ON r.room_number = x.room_number
+ WHERE q.room_id = r.room_id;
 
 -- A forgot-password request waiting for the supervisor.
 INSERT INTO hk_password_resets (user_id, requested_at)

@@ -102,7 +102,7 @@ decides otherwise.
 | Guest requests | FO-014: Front Office records guest requests | Housekeeping-type requests (towels, amenities, extra bed, cleaning, laundry) are kept in `hk_guest_requests` |
 | Schedules | HR owns employee schedules | `hk_schedules` holds housekeeping shift and area assignments only |
 | Requirement codes | Class HK-001 to HK-011 | See `REQUIREMENTS-MAPPING.md` |
-| Linen and supply inventory | Not in the class requirements | `hk_inventory_items` and `hk_inventory_movements`, owned by Housekeeping. Purchasing stays with Finance; Housekeeping only records stock on hand and use |
+| Linen and supply inventory | Not in the class requirements | `hk_inventory_items` and `hk_inventory_movements`, owned by Housekeeping. Guest requests can name a stock item (`inv_item_id`, `quantity_requested`, `stock_approved_at`); there is no Inventory page. Purchasing stays with Finance; Housekeeping only records stock on hand and use |
 | Forgot password | Not settled (Users and Roles gives ADMIN user management) | Housekeeping supervisors set temporary passwords for active HOUSEKEEPING accounts only (`hk_password_resets`, `hk_password_must_change`); ADMIN keeps full user management |
 | Login lockout | NFR-SEC-001 | Failed sign-ins in `hk_login_failures` (5 failures per account and address in 15 minutes). A shared login can replace it |
 

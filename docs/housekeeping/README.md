@@ -40,10 +40,14 @@ with a confirmation pop-up. The logo and photo in
 
 * November 3-4, 2026: staff dashboard for housekeepers, Account, Personal
   Record, Report Room, and phone layouts.
-* November 12, 2026: Inventory, Reports and Staff Accounts pages; lost and
-  found photos, QR labels, claim ID details and supervisor disposal; forgot
-  password; stricter room, inspection, guest request and schedule rules. See
-  "Added after the November 12, 2026 audit" in the main README.
+* November 12, 2026: the Figma's Inventory stock card on Guest Requests;
+  Staff Accounts page; lost and found photos, QR labels, claim ID details and
+  supervisor disposal; forgot password; stricter room, inspection, guest
+  request and schedule rules. See "Added after the November 12, 2026 audit"
+  in the main README.
 
-The Inventory, Reports and Staff Accounts pages were designed in the same
-style as the Figma screens; they are not in the Figma file yet.
+Checked against the Figma file on November 12, 2026: it has no Inventory,
+Reports or Staff Accounts screen, so the app has no Inventory or Reports
+page (reports are the Generate Report boxes on Maintenance and Inspection).
+Staff Accounts is kept, in the Figma style, because the Figma login's
+"Forgot password?" link needs a place where a supervisor handles the request.

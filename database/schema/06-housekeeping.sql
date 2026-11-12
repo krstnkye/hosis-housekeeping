@@ -239,6 +239,12 @@ CREATE TABLE IF NOT EXISTS hk_inventory_movements (
     moved_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
+-- Guest requests that need stock (e.g. 2 bath towels): the item and amount,
+-- and when the stock was approved and taken out of inventory.
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS inv_item_id        INT REFERENCES hk_inventory_items(inv_item_id);
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS quantity_requested INT CHECK (quantity_requested > 0);
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS stock_approved_at  TIMESTAMP;
+
 CREATE INDEX IF NOT EXISTS idx_hk_inv_moves_item  ON hk_inventory_movements (inv_item_id);
 CREATE INDEX IF NOT EXISTS idx_hk_logs_changed    ON hk_room_status_logs (changed_at);
 
