@@ -19,7 +19,13 @@
 -- Dates are relative to CURRENT_DATE so the demo always looks current.
 -- =====================================================================
 
-TRUNCATE hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
+-- Same time zone as the backend (DB_TIME_ZONE), so sample times loaded with
+-- psql line up with times the app records. Change it if DB_TIME_ZONE differs.
+SET TIME ZONE 'Asia/Manila';
+
+TRUNCATE hk_inventory_movements, hk_inventory_items, hk_password_must_change,
+         hk_password_resets, hk_login_failures, hk_lost_found_photos,
+         hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
          hk_lost_found_items, hk_guest_requests, hk_schedules, hk_inspections,
          hk_cleaning_tasks, hk_room_status_logs
 RESTART IDENTITY;
@@ -75,6 +81,31 @@ FROM (VALUES
 JOIN rooms r ON r.room_number = t.room_number
 LEFT JOIN users u ON u.username = t.username;
 
+-- Finished work from the past week (Reports page history).
+INSERT INTO hk_cleaning_tasks (room_id, staff_id, task_type, priority, task_status, notes, assigned_date, start_time, completion_time, created_at)
+SELECT r.room_id, u.user_id, h.task_type, 'NORMAL', 'INSPECTED', NULL, CURRENT_DATE - h.days_ago,
+       (CURRENT_DATE - h.days_ago) + TIME '09:00', (CURRENT_DATE - h.days_ago) + TIME '09:45',
+       (CURRENT_DATE - h.days_ago) + TIME '08:00'
+FROM (VALUES
+    ('101', 'hk.liza', 'CHECKOUT',   1), ('203', 'hk.joy',  'STAYOVER',   1),
+    ('303', 'hk.mark', 'CHECKOUT',   2), ('102', 'hk.liza', 'STAYOVER',   3),
+    ('202', 'hk.joy',  'DEEP_CLEAN', 4), ('301', 'hk.mark', 'CHECKOUT',   5),
+    ('104', 'hk.liza', 'TOUCH_UP',   6)
+) AS h(room_number, username, task_type, days_ago)
+JOIN rooms r ON r.room_number = h.room_number
+JOIN users u ON u.username = h.username;
+
+INSERT INTO hk_inspections (task_id, inspected_by, inspection_result, checklist, remarks, inspected_at)
+SELECT t.task_id, u.user_id, 'PASSED', '{}'::jsonb, NULL, t.completion_time + INTERVAL '20 minutes'
+FROM hk_cleaning_tasks t, users u
+WHERE t.task_status = 'INSPECTED' AND u.username = 'hk.inspector';
+
+-- One of those rooms failed its first inspection before passing.
+INSERT INTO hk_inspections (task_id, inspected_by, inspection_result, checklist, remarks, inspected_at)
+SELECT t.task_id, u.user_id, 'FAILED', '{}'::jsonb, 'Bathroom mirror streaked', t.completion_time - INTERVAL '10 minutes'
+FROM hk_cleaning_tasks t JOIN rooms r ON r.room_id = t.room_id, users u
+WHERE t.task_status = 'INSPECTED' AND r.room_number = '303' AND u.username = 'hk.inspector';
+
 INSERT INTO hk_schedules (staff_id, shift_date, shift, start_time, end_time, assigned_area)
 SELECT u.user_id, CURRENT_DATE + s.day_offset, s.shift, s.start_time::time, s.end_time::time, s.area
 FROM (VALUES
@@ -127,3 +158,40 @@ FROM (VALUES
 ) AS l(room_number, username, prev, next, remarks, age)
 JOIN rooms r ON r.room_number = l.room_number
 JOIN users u ON u.username = l.username;
+
+-- Linen, amenity and cleaning-supply stock (Inventory page).
+INSERT INTO hk_inventory_items (item_name, category, unit, quantity, reorder_level, storage_area) VALUES
+    ('Bath towel',          'LINEN',           'pcs',     120, 60, 'Linen room - Floor 1'),
+    ('Hand towel',          'LINEN',           'pcs',      45, 50, 'Linen room - Floor 1'),
+    ('Bed sheet (queen)',   'LINEN',           'pcs',      80, 40, 'Linen room - Floor 2'),
+    ('Pillowcase',          'LINEN',           'pcs',     150, 60, 'Linen room - Floor 2'),
+    ('Shampoo 30 ml',       'AMENITY',         'bottles', 200, 80, 'Supply room'),
+    ('Toothbrush kit',      'AMENITY',         'kits',     30, 40, 'Supply room'),
+    ('Slippers',            'AMENITY',         'pairs',    90, 40, 'Supply room'),
+    ('All-purpose cleaner', 'CLEANING_SUPPLY', 'liters',   18, 10, 'Janitor closet'),
+    ('Disinfectant spray',  'CLEANING_SUPPLY', 'cans',      6, 12, 'Janitor closet'),
+    ('Trash bags',          'CLEANING_SUPPLY', 'rolls',    25, 10, 'Janitor closet');
+
+INSERT INTO hk_inventory_movements (inv_item_id, movement_type, quantity, balance_after, room_id, remarks, staff_id, moved_at)
+SELECT i.inv_item_id, m.kind, m.qty, i.quantity, r.room_id, m.remarks, u.user_id, NOW() - m.age::interval
+FROM (VALUES
+    ('Bath towel',         'OUT', 4,  '205', 'hk.liza',       'Room turnover',            '40 minutes'),
+    ('Toothbrush kit',     'OUT', 2,  '102', 'hk.joy',        'Guest request',            '2 hours'),
+    ('Disinfectant spray', 'OUT', 2,  NULL,  'hk.mark',       'Floor 2 bathrooms',        '5 hours'),
+    ('Bath towel',         'IN',  60, NULL,  'hk.supervisor', 'Laundry return',           '1 day')
+) AS m(item_name, kind, qty, room_number, username, remarks, age)
+JOIN hk_inventory_items i ON i.item_name = m.item_name
+JOIN users u ON u.username = m.username
+LEFT JOIN rooms r ON r.room_number = m.room_number;
+
+-- Guest requests that take items from stock (the Inventory stock card).
+UPDATE hk_guest_requests q
+   SET inv_item_id = i.inv_item_id, quantity_requested = x.qty
+  FROM (VALUES ('102', 'Bath towel', 2), ('202', 'Toothbrush kit', 1)) AS x(room_number, item_name, qty)
+  JOIN hk_inventory_items i ON i.item_name = x.item_name
+  JOIN rooms r ON r.room_number = x.room_number
+ WHERE q.room_id = r.room_id;
+
+-- A forgot-password request waiting for the supervisor.
+INSERT INTO hk_password_resets (user_id, requested_at)
+SELECT user_id, NOW() - INTERVAL '30 minutes' FROM users WHERE username = 'hk.mark';

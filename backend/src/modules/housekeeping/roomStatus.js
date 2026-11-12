@@ -7,11 +7,13 @@ const ROOM_STATUSES = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'DIRTY', 'CLEAN', 'I
 // - INSPECTED is set only by a passed inspection (HK-007), so every pass is recorded.
 // - OUT_OF_ORDER is set only through a maintenance request (HK-015), and a room
 //   leaves it only when that request is released after Engineering's repair.
+// - CLEAN is set only by completing a cleaning task (HK-006), so a room cannot
+//   skip cleaning and inspection by being marked CLEAN by hand.
 const MANUAL_TRANSITIONS = {
   AVAILABLE: ['DIRTY'],
   RESERVED: [],
   OCCUPIED: ['DIRTY'],
-  DIRTY: ['CLEAN'],
+  DIRTY: [],
   CLEAN: ['DIRTY'],
   INSPECTED: ['DIRTY'],
   OUT_OF_ORDER: [],

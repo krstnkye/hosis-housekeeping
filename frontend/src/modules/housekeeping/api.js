@@ -28,6 +28,15 @@ export function saveSession({ token, user }, remember) {
   store.setItem(USER_KEY, JSON.stringify(user))
 }
 
+// After a password change the server hands back a new token (the old one
+// stops working). Keep it in the same place as the current session.
+export function replaceSession({ token, user }) {
+  if (externalSession) return
+  const store = storage()
+  store.setItem(TOKEN_KEY, token)
+  store.setItem(USER_KEY, JSON.stringify(user))
+}
+
 export function clearSession() {
   for (const store of [localStorage, sessionStorage]) {
     store.removeItem(TOKEN_KEY)
@@ -66,12 +75,32 @@ export async function request(method, path, body) {
   return data
 }
 
+// Loads a protected image (e.g. a lost-and-found photo) and returns a
+// blob: URL the page can show in an <img>.
+export async function fetchImage(path) {
+  const session = getSession()
+  const res = await fetch(`/api${path}`, {
+    headers: session ? { Authorization: `Bearer ${session.token}` } : {},
+  })
+  if (!res.ok) throw new ApiError(res.status, 'Photo could not be loaded')
+  return URL.createObjectURL(await res.blob())
+}
+
 const HK = '/housekeeping'
 
 export const api = {
   login: (body) => request('POST', '/auth/login', body),
   account: () => request('GET', '/auth/account'),
   changePassword: (body) => request('POST', '/auth/password', body),
+  forgotPassword: (body) => request('POST', '/auth/forgot-password', body),
+
+  passwordResets: () => request('GET', `${HK}/password-resets`),
+  resetStaffPassword: (userId) => request('POST', `${HK}/password-resets/staff/${userId}`),
+  dismissReset: (id) => request('POST', `${HK}/password-resets/${id}/dismiss`),
+
+
+  inventory: (q = '') => request('GET', `${HK}/inventory${q}`),
+  approveRequestStock: (id) => request('POST', `${HK}/guest-requests/${id}/approve-stock`),
 
   dashboard: () => request('GET', `${HK}/dashboard`),
   staff: () => request('GET', `${HK}/staff`),
@@ -111,6 +140,10 @@ export const api = {
   updateItem: (id, body) => request('PATCH', `${HK}/lost-found/${id}`, body),
   itemClaims: (id) => request('GET', `${HK}/lost-found/${id}/claims`),
   claimItem: (id, body) => request('POST', `${HK}/lost-found/${id}/claims`, body),
+  disposeItem: (id, body) => request('POST', `${HK}/lost-found/${id}/dispose`, body),
+  addItemPhoto: (id, image) => request('POST', `${HK}/lost-found/${id}/photos`, { image }),
+  deleteItemPhoto: (id, photoId) => request('DELETE', `${HK}/lost-found/${id}/photos/${photoId}`),
+  itemPhotoPath: (id, photoId) => `${HK}/lost-found/${id}/photos/${photoId}`,
 
   maintenance: (q = '') => request('GET', `${HK}/maintenance${q}`),
   reportIssue: (body) => request('POST', `${HK}/maintenance`, body),

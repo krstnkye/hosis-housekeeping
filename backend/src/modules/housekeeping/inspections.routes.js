@@ -10,7 +10,7 @@ const router = express.Router();
 // Rooms waiting for inspection: tasks that are cleaned but not yet inspected.
 router.get('/queue', async (req, res) => {
   const { rows } = await db.query(
-    `SELECT t.task_id, t.task_type, t.priority, t.start_time, t.completion_time, t.notes,
+    `SELECT t.task_id, t.staff_id, t.task_type, t.priority, t.start_time, t.completion_time, t.notes,
             r.room_id, r.room_number, r.room_type, r.room_status,
             CONCAT(u.first_name, ' ', u.last_name) AS housekeeper,
             (SELECT COUNT(*)::int FROM hk_inspections i WHERE i.task_id = t.task_id) AS previous_inspections
@@ -55,6 +55,7 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
   if (body.result === 'FAILED' && !body.remarks) {
     throw new HttpError(400, 'Please write what needs re-cleaning when an inspection fails.');
   }
+  v.maxLengths(body, { remarks: [255, 'Remarks'] });
   const checklist = body.checklist && typeof body.checklist === 'object' ? body.checklist : {};
 
   const result = await db.withTransaction(async (client) => {
@@ -68,6 +69,10 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
     }
     if (task.task_status !== 'COMPLETED') {
       throw new HttpError(409, 'Only completed cleaning tasks can be inspected.');
+    }
+    // Four-eyes rule: whoever cleaned the room cannot approve their own work.
+    if (task.staff_id === req.user.userId) {
+      throw new HttpError(409, 'You cleaned this room, so another inspector or supervisor must inspect it.');
     }
     await assertNotOutOfOrder(client, task.room_id);
     const { rows } = await client.query(

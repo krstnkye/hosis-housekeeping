@@ -8,7 +8,7 @@ without converting its source code.
 
 | Layer | Language / technology | Class repository compatibility |
 | --- | --- | --- |
-| Frontend | JavaScript, JSX, React 19, Vite 8, CSS | Same versions (plus `jspdf`, `jspdf-autotable`, `write-excel-file` for report exports) |
+| Frontend | JavaScript, JSX, React 19, Vite 8, CSS | Same versions (plus `jspdf`, `jspdf-autotable`, `write-excel-file` for report exports and `qrcode` for lost-and-found labels) |
 | Backend | JavaScript, Node.js, CommonJS, Express 5 | Same versions |
 | Database | PostgreSQL SQL through the `pg` driver | Same driver version |
 | Authentication | JSON Web Token and bcrypt | Same versions |
@@ -73,8 +73,20 @@ HOSIS tables that must exist before `06-housekeeping.sql` is loaded:
 | Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
 | Front Office | `GET /api/housekeeping/notifications?unread=1` | Notices from Housekeeping: `notice_type` ROOM_READY (room passed inspection) or ROOM_CONDITION (a staff member reported a room's condition: damage, missing items, smoking, ...) |
 | Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
+| Front Office (stand-in) | `GET /api/housekeeping/front-office/rooms` | Every room and its status (used by `npm run frontoffice`) |
+| Front Office (stand-in) | `POST /api/housekeeping/front-office/release` `{ roomId }` | INSPECTED → AVAILABLE and the room's ROOM_READY notices marked read |
+| Front Office (stand-in) | `POST /api/housekeeping/front-office/check-in` `{ roomId }` | AVAILABLE or RESERVED → OCCUPIED |
 | Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
 | Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` |
+
+The three stand-in endpoints only let the standalone demo finish the room
+cycle. Once the Front Office module handles check-in and room release itself,
+remove them from `frontOffice.routes.js` (or keep them only for demos).
+
+Front Office should read `notice_type` on each notice: `ROOM_READY` means the
+room can be released as AVAILABLE; `ROOM_CONDITION` is a staff member's report
+(damage, missing items, smoking, pests, safety hazard, excessive mess) that
+Front Office may need to charge or follow up with the guest.
 
 ## Decisions to confirm with the project manager
 
@@ -90,6 +102,9 @@ decides otherwise.
 | Guest requests | FO-014: Front Office records guest requests | Housekeeping-type requests (towels, amenities, extra bed, cleaning, laundry) are kept in `hk_guest_requests` |
 | Schedules | HR owns employee schedules | `hk_schedules` holds housekeeping shift and area assignments only |
 | Requirement codes | Class HK-001 to HK-011 | See `REQUIREMENTS-MAPPING.md` |
+| Linen and supply inventory | Not in the class requirements | `hk_inventory_items` and `hk_inventory_movements`, owned by Housekeeping. Guest requests can name a stock item (`inv_item_id`, `quantity_requested`, `stock_approved_at`); there is no Inventory page. Purchasing stays with Finance; Housekeeping only records stock on hand and use |
+| Forgot password | Not settled (Users and Roles gives ADMIN user management) | Housekeeping supervisors set temporary passwords for active HOUSEKEEPING accounts only (`hk_password_resets`, `hk_password_must_change`); ADMIN keeps full user management |
+| Login lockout | NFR-SEC-001 | Failed sign-ins in `hk_login_failures` (5 failures per account and address in 15 minutes). A shared login can replace it |
 
 ## Merge checklist for the project manager
 
@@ -100,18 +115,25 @@ decides otherwise.
    parser, CORS setup (`CORS_ORIGIN`), error handler, server listener, and
    PostgreSQL pool.
 4. Reuse the class-wide login if its JWT contains `userId`, `role` and
-   `position`. Otherwise keep `backend/src/modules/auth/` until login is
-   unified.
+   `position` and is signed with the same `JWT_SECRET`. Otherwise keep
+   `backend/src/modules/auth/` until login is unified. Housekeeping's
+   `authenticate` re-reads the account on every request (status, role,
+   position, temporary password), so a deactivated account is signed out at
+   once. Tokens from Housekeeping's own login also carry `pwv`, a short
+   fingerprint of the password hash, so they stop working when the password
+   changes; tokens without `pwv` are still accepted.
+   The JSON body limit is 3 MB so one lost-and-found photo fits; keep it at
+   least that large in the shared `express.json()`.
 5. Load the SQL schemas in numerical order. Never load
    `database/standalone/00-shared-tables.sql` there. Load the Housekeeping seed
    only in a development or demo database: it resets all `hk_` tables.
 6. Keep the `hk_` table prefix and the `/api/housekeeping` route prefix.
-7. Install `jspdf`, `jspdf-autotable` and `write-excel-file` in the combined
-   frontend.
+7. Install `jspdf`, `jspdf-autotable`, `write-excel-file` and `qrcode` in the
+   combined frontend.
 8. Run `npm run lint` and `npm run build` in `frontend/`, and `npm test` in
    `backend/` against a test database.
-9. Test with Front Office (checkout and room-ready notices) and Engineering
-   (incoming requests and REPAIRED) together.
+9. Test with Front Office (checkout, room-ready and room-condition notices,
+   room release) and Engineering (incoming requests and REPAIRED) together.
 
 ## Environment variables
 

@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node --test",
-    "engineering": "node scripts/engineering-update.js"
+    "engineering": "node scripts/engineering-update.js",
+    "frontoffice": "node scripts/front-office.js"
   },
   "keywords": [],
   "author": "",

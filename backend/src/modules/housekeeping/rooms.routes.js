@@ -80,6 +80,10 @@ router.patch('/:id/status', async (req, res) => {
   if (req.body.status === 'INSPECTED') {
     throw new HttpError(409, 'A room becomes INSPECTED only by passing an inspection on the Inspection page.');
   }
+  if (req.body.status === 'CLEAN') {
+    throw new HttpError(409, 'A room becomes CLEAN when its cleaning task is completed on the Cleaning Tasks page, so it then goes to inspection.');
+  }
+  v.maxLengths(req.body, { remarks: [255, 'Remarks'] });
   if (req.body.status === 'OUT_OF_ORDER') {
     throw new HttpError(409, 'Report the problem on the Maintenance page to set a room OUT OF ORDER.');
   }

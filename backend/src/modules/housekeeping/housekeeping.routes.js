@@ -1,11 +1,13 @@
 const express = require('express');
 const db = require('../../config/db');
-const { authenticate, authorize } = require('../../middleware/auth');
+const { authenticate, authorize, requirePasswordChanged } = require('../../middleware/auth');
 
 const router = express.Router();
 
 // All Housekeeping endpoints need a logged-in user.
 router.use(authenticate);
+// A temporary password (set by a supervisor) must be changed first.
+router.use(requirePasswordChanged);
 
 // Integration endpoints for other HOSIS departments. Each route checks its own
 // role, so these are mounted before the HOUSEKEEPING-only gate below.
@@ -27,7 +29,8 @@ router.get('/dashboard', async (req, res) => {
        (SELECT COUNT(*) FROM hk_lost_found_items WHERE item_status = 'STORED')::int AS stored_items,
        (SELECT COUNT(*) FROM hk_maintenance_requests WHERE status <> 'CLOSED')::int AS open_maintenance,
        (SELECT COUNT(*) FROM hk_cleaning_tasks
-         WHERE staff_id = $1 AND task_status IN ('ASSIGNED', 'IN_PROGRESS', 'RETURNED'))::int AS my_tasks`,
+         WHERE staff_id = $1 AND task_status IN ('ASSIGNED', 'IN_PROGRESS', 'RETURNED'))::int AS my_tasks,
+       (SELECT COUNT(*) FROM hk_inventory_items WHERE active AND quantity <= reorder_level)::int AS low_stock_items`,
     [req.user.userId]
   );
   res.json({ stats: rows[0] });
@@ -59,9 +62,23 @@ router.get('/alerts', async (req, res) => {
        SELECT 'MAINTENANCE', CONCAT('Room ', r.room_number, ' repair finished, ready to release'), m.resolved_at, 'maintenance'
          FROM hk_maintenance_requests m JOIN rooms r ON r.room_id = m.room_id
         WHERE m.status = 'REPAIRED'
+       UNION ALL
+       SELECT 'STOCK', CONCAT(i.item_name, ' is low: ', i.quantity, ' ', i.unit, ' left (reorder at ', i.reorder_level, ')'),
+              COALESCE((SELECT MAX(m.moved_at) FROM hk_inventory_movements m WHERE m.inv_item_id = i.inv_item_id), i.created_at),
+              'requests'
+         FROM hk_inventory_items i
+        WHERE i.active AND i.quantity <= i.reorder_level AND $3
+       UNION ALL
+       SELECT 'PASSWORD', CONCAT(u.first_name, ' ', u.last_name, ' forgot their password'), p.requested_at, 'staff-accounts'
+         FROM hk_password_resets p JOIN users u ON u.user_id = p.user_id
+        WHERE p.status = 'REQUESTED' AND $3
      ) a
      ORDER BY at DESC NULLS LAST LIMIT 15`,
-    [req.user.userId, ['INSPECTOR', 'SUPERVISOR'].includes(req.user.position) || req.user.role === 'ADMIN']
+    [
+      req.user.userId,
+      ['INSPECTOR', 'SUPERVISOR'].includes(req.user.position) || req.user.role === 'ADMIN',
+      req.user.position === 'SUPERVISOR' || req.user.role === 'ADMIN',
+    ]
   );
   res.json({ alerts: rows });
 });
@@ -105,6 +122,8 @@ router.use('/schedules', require('./schedules.routes'));
 router.use('/guest-requests', require('./guestRequests.routes'));
 router.use('/lost-found', require('./lostFound.routes'));
 router.use('/maintenance', require('./maintenance.routes'));
+router.use('/inventory', require('./inventory.routes'));
+router.use('/password-resets', require('./passwordResets.routes'));
 router.use(require('./me.routes'));
 
 module.exports = router;

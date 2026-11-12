@@ -49,7 +49,7 @@ function StaffSchedules({ user, search }) {
   const [creating, setCreating] = useState(false)
   const [flash, setFlash] = useState(null)
   const schedules = useLoad(() => api.schedules(date), [date])
-  const staff = useLoad(() => api.staff(), [])
+  const staff = useLoad(() => api.staff(), [], { refresh: false })
   const isSupervisor = user.position === 'SUPERVISOR' || user.role === 'ADMIN'
 
   const onDuty = schedules.data?.schedules || []
@@ -237,6 +237,9 @@ function ScheduleForm({ schedule, date, staff, isSupervisor, onNew, onSaved }) {
             disabled={!isSupervisor}
             format={(d) => longDate(d, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           />
+          {isSupervisor && form.shiftDate < todayISO() && form.shiftDate !== schedule?.shift_date && (
+            <span className="hk-field__error">This date has passed. Choose today or a later date.</span>
+          )}
         </Field>
         <Field label="Shift">
           <select value={form.shift} onChange={setShift} disabled={!isSupervisor}>

@@ -9,7 +9,8 @@ const app = express();
 
 // Only the HOSIS frontend may call the API from a browser (set CORS_ORIGIN).
 app.use(cors({ origin: corsOrigins() }));
-app.use(express.json());
+// 3 MB leaves room for one lost-and-found photo (2 MB) sent as base64.
+app.use(express.json({ limit: '3mb' }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

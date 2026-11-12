@@ -162,6 +162,92 @@ ALTER TABLE hk_front_office_notifications
     ADD COLUMN IF NOT EXISTS notice_type VARCHAR(20) NOT NULL DEFAULT 'ROOM_READY'
         CHECK (notice_type IN ('ROOM_READY', 'ROOM_CONDITION'));
 
+-- ---------------------------------------------------------------------
+-- Additions from the November 2026 audit
+-- ---------------------------------------------------------------------
+
+-- Lost & found: who disposed of an item, when and why.
+ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposed_by     INT REFERENCES users(user_id);
+ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposed_at     TIMESTAMP;
+ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposal_reason VARCHAR(255);
+
+-- Item claims: which ID the claimant showed. Only the last 4 characters of
+-- the ID number are kept, so the record does not hold a full ID number.
+ALTER TABLE hk_item_claims ADD COLUMN IF NOT EXISTS id_type       VARCHAR(30);
+ALTER TABLE hk_item_claims ADD COLUMN IF NOT EXISTS id_last4      VARCHAR(4);
+
+-- Photos of found items (stored in the database, JPEG/PNG/WebP, up to 2 MB).
+CREATE TABLE IF NOT EXISTS hk_lost_found_photos (
+    photo_id     SERIAL PRIMARY KEY,
+    item_id      INT          NOT NULL REFERENCES hk_lost_found_items(item_id) ON DELETE CASCADE,
+    content_type VARCHAR(30)  NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    data         BYTEA        NOT NULL,
+    uploaded_by  INT          NOT NULL REFERENCES users(user_id),
+    uploaded_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Failed sign-ins, kept in the database so the lockout survives a restart.
+CREATE TABLE IF NOT EXISTS hk_login_failures (
+    attempt_key  VARCHAR(200) PRIMARY KEY,
+    failures     INT          NOT NULL DEFAULT 1,
+    first_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Forgot password: a staff member asks, a supervisor sets a temporary
+-- password, and the staff member must choose a new one at the next sign-in.
+CREATE TABLE IF NOT EXISTS hk_password_resets (
+    reset_id      SERIAL PRIMARY KEY,
+    user_id       INT          NOT NULL REFERENCES users(user_id),
+    status        VARCHAR(20)  NOT NULL DEFAULT 'REQUESTED'
+        CHECK (status IN ('REQUESTED', 'DONE', 'DISMISSED')),
+    requested_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    handled_by    INT          REFERENCES users(user_id),
+    handled_at    TIMESTAMP
+);
+
+-- Accounts that must change their password at the next sign-in.
+CREATE TABLE IF NOT EXISTS hk_password_must_change (
+    user_id  INT PRIMARY KEY REFERENCES users(user_id),
+    set_by   INT REFERENCES users(user_id),
+    set_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- INVENTORY_ITEM: linen, guest amenities and cleaning supplies.
+CREATE TABLE IF NOT EXISTS hk_inventory_items (
+    inv_item_id   SERIAL PRIMARY KEY,
+    item_name     VARCHAR(100) NOT NULL UNIQUE,
+    category      VARCHAR(20)  NOT NULL CHECK (category IN ('LINEN', 'AMENITY', 'CLEANING_SUPPLY')),
+    unit          VARCHAR(20)  NOT NULL,
+    quantity      INT          NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+    reorder_level INT          NOT NULL DEFAULT 0 CHECK (reorder_level >= 0),
+    storage_area  VARCHAR(100),
+    active        BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- INVENTORY_MOVEMENT: every stock change. IN = delivery or laundry return,
+-- OUT = used in a room or sent to laundry, ADJUST = stock count correction.
+CREATE TABLE IF NOT EXISTS hk_inventory_movements (
+    movement_id   SERIAL PRIMARY KEY,
+    inv_item_id   INT          NOT NULL REFERENCES hk_inventory_items(inv_item_id),
+    movement_type VARCHAR(10)  NOT NULL CHECK (movement_type IN ('IN', 'OUT', 'ADJUST')),
+    quantity      INT          NOT NULL,
+    balance_after INT          NOT NULL CHECK (balance_after >= 0),
+    room_id       INT          REFERENCES rooms(room_id),
+    remarks       VARCHAR(255),
+    staff_id      INT          NOT NULL REFERENCES users(user_id),
+    moved_at      TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Guest requests that need stock (e.g. 2 bath towels): the item and amount,
+-- and when the stock was approved and taken out of inventory.
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS inv_item_id        INT REFERENCES hk_inventory_items(inv_item_id);
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS quantity_requested INT CHECK (quantity_requested > 0);
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS stock_approved_at  TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_hk_inv_moves_item  ON hk_inventory_movements (inv_item_id);
+CREATE INDEX IF NOT EXISTS idx_hk_logs_changed    ON hk_room_status_logs (changed_at);
+
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_status   ON hk_cleaning_tasks (task_status);
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_staff    ON hk_cleaning_tasks (staff_id);
 CREATE INDEX IF NOT EXISTS idx_hk_logs_room      ON hk_room_status_logs (room_id);

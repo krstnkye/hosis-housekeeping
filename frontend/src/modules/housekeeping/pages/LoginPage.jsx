@@ -118,7 +118,7 @@ export default function LoginPage({ onLogin }) {
           <button type="button" className="hk-login__forgot" onClick={() => setForgot(!forgot)} aria-expanded={forgot}>
             Forgot password?
           </button>
-          {forgot && <p className="hk-muted hk-login__hint">Ask the system administrator to reset your password.</p>}
+          {forgot && <ForgotPassword initial={form.username} />}
         </form>
       </div>
 
@@ -143,6 +143,44 @@ export default function LoginPage({ onLogin }) {
             Back to sign in
           </button>
         </Modal>
+      )}
+    </div>
+  )
+}
+
+// Forgot password: the request goes to the Housekeeping supervisor, who gives
+// the staff member a temporary password in person (there is no email server).
+function ForgotPassword({ initial }) {
+  const [username, setUsername] = useState(initial)
+  const [state, setState] = useState({ busy: false, done: null, error: null })
+
+  async function send() {
+    if (!username.trim()) return
+    setState({ busy: true, done: null, error: null })
+    try {
+      const res = await api.forgotPassword({ username: username.trim() })
+      setState({ busy: false, done: res.message, error: null })
+    } catch (err) {
+      setState({ busy: false, done: null, error: err.message })
+    }
+  }
+
+  return (
+    <div className="hk-login__forgot-box">
+      {state.done ? (
+        <Notice tone="green" title="Request sent">{state.done}</Notice>
+      ) : (
+        <>
+          <p className="hk-muted hk-login__hint">Your supervisor will set a temporary password and give it to you. You will choose a new one when you sign in.</p>
+          <label className="hk-field">
+            <span className="hk-field__label">Your email or username</span>
+            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+          </label>
+          {state.error && <Notice tone="red" title="Not sent">{state.error}</Notice>}
+          <button type="button" className="hk-btn hk-btn--secondary hk-btn--block" disabled={state.busy || !username.trim()} onClick={send}>
+            {state.busy ? 'Sending...' : 'Ask my supervisor to reset it'}
+          </button>
+        </>
       )}
     </div>
   )

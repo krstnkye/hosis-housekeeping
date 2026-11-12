@@ -9,7 +9,14 @@ export const TABS = [
   { id: 'lost-found', name: 'Lost & Found', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 14v3' },
   { id: 'requests', name: 'Guest Requests', icon: 'M12 21a9 9 0 1 1 6.4-15.4M21 4l-9 9-3-3M9.5 15.5h4' },
   { id: 'maintenance', name: 'Maintenance', icon: 'M7 3h10v4H7zM9 7v14h6V7M9 12h6M9 16h6' },
+  { id: 'staff-accounts', name: 'Staff Accounts', icon: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8h5M19.5 5.5v5' },
 ]
+
+// Which positions see each supervisor-menu page. Pages not listed are shown
+// to supervisors and inspectors alike.
+export const TAB_POSITIONS = {
+  'staff-accounts': ['SUPERVISOR'],
+}
 
 // Extra pages in the housekeeping staff menu (Staff Dashboard).
 export const STAFF_TABS = [

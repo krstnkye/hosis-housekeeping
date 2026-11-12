@@ -1,10 +1,24 @@
-import { useState } from 'react'
-import { api } from '../api.js'
+import { useEffect, useRef, useState } from 'react'
+import { api, fetchImage } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
 import Modal from '../components/Modal.jsx'
 import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
 import { formatDateTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
+
+const ID_TYPES = [
+  ['PASSPORT', 'Passport'],
+  ['DRIVERS_LICENSE', "Driver's license"],
+  ['NATIONAL_ID', 'National ID (PhilSys)'],
+  ['UMID', 'UMID'],
+  ['SSS', 'SSS ID'],
+  ['PHILHEALTH', 'PhilHealth ID'],
+  ['POSTAL_ID', 'Postal ID'],
+  ['VOTERS_ID', "Voter's ID"],
+  ['COMPANY_ID', 'Company ID'],
+  ['OTHER', 'Other government ID'],
+]
+const ID_LABEL = Object.fromEntries(ID_TYPES)
 
 const REPORT_COLUMNS = [
   { title: 'Label', value: (i) => i.storage_label },
@@ -17,16 +31,18 @@ const REPORT_COLUMNS = [
 ]
 
 // HK-010 Record Found Item -> Store/Label -> HK-011 Search/View -> Valid Claim? -> HK-012 Release.
-export default function LostFoundPage({ search: topSearch }) {
+export default function LostFoundPage({ search: topSearch, user }) {
+  const supervisor = user?.position === 'SUPERVISOR' || user?.role === 'ADMIN'
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [openId, setOpenId] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [labelFor, setLabelFor] = useState(null)
   const [flash, setFlash] = useState(null)
   const [itemOverrides, setItemOverrides] = useState({})
   const items = useLoad(() => api.lostFound(status ? `?status=${status}` : ''), [status])
-  const rooms = useLoad(() => api.rooms(), [])
+  const rooms = useLoad(() => api.rooms(), [], { refresh: false })
 
   const query = (search || topSearch).toLowerCase()
   const list = (items.data?.items || [])
@@ -102,7 +118,14 @@ export default function LostFoundPage({ search: topSearch }) {
                   <dt>Date / time</dt><dd>{formatDateTime(selected.found_at)}</dd>
                   <dt>Storage</dt><dd>{selected.storage_location}</dd>
                 </dl>
+                {selected.photo_ids?.length > 0 && <PhotoStrip item={selected} />}
+                {selected.item_status === 'DISPOSED' && (
+                  <Notice tone="amber" title={`Disposed by ${selected.disposed_by_name || 'a supervisor'}`}>
+                    {formatDateTime(selected.disposed_at)} · {selected.disposal_reason}
+                  </Notice>
+                )}
                 <div className="hk-actions">
+                  <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setLabelFor(selected)}>Print label</button>
                   <button type="button" className="hk-btn hk-btn--primary" onClick={() => setOpenId(selected.item_id)}>
                     {selected.item_status === 'STORED' ? 'Found item → verify claim' : 'Found item →'}
                   </button>
@@ -118,7 +141,12 @@ export default function LostFoundPage({ search: topSearch }) {
 
       {opened && (
         <Modal title={`Found item ${opened.storage_label}`} onClose={() => setOpenId(null)}>
-          <ItemDetail key={opened.item_id} item={opened} onSaved={refresh} />
+          <ItemDetail key={opened.item_id} item={opened} onSaved={refresh} supervisor={supervisor} onPhotoAdded={items.reload} />
+        </Modal>
+      )}
+      {labelFor && (
+        <Modal title={`Label ${labelFor.storage_label}`} onClose={() => setLabelFor(null)}>
+          <ItemLabel item={labelFor} />
         </Modal>
       )}
       {creating && rooms.data && (
@@ -141,15 +169,23 @@ function ClaimHistory({ item }) {
       </div>
       {list.map((c) => (
         <div key={c.claim_id} className="hk-custody">
-          {formatDateTime(c.claimed_at)}: claim by {c.claimant_name} {c.claim_status === 'VALID' ? 'verified and released' : 'rejected'} by {c.processed_by_name}.
+          {formatDateTime(c.claimed_at)}: claim by {c.claimant_name}
+          {c.id_type ? ` (${ID_LABEL[c.id_type] || label(c.id_type)} ending ${c.id_last4})` : ''}{' '}
+          {c.claim_status === 'VALID' ? 'verified and released' : 'rejected'} by {c.processed_by_name}.
         </div>
       ))}
+      {item.item_status === 'DISPOSED' && (
+        <div className="hk-custody">
+          {formatDateTime(item.disposed_at)}: disposed by {item.disposed_by_name}. Reason: {item.disposal_reason}
+        </div>
+      )}
     </Card>
   )
 }
 
 function NewItemForm({ rooms, onSaved }) {
   const [form, setForm] = useState({ roomId: '', foundLocation: '', description: '', storageLocation: '' })
+  const [photo, setPhoto] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
@@ -159,6 +195,13 @@ function NewItemForm({ rooms, onSaved }) {
     setError(null)
     try {
       const { item } = await api.createItem({ ...form, roomId: form.roomId || null })
+      if (photo) {
+        try {
+          await api.addItemPhoto(item.item_id, photo)
+        } catch {
+          // The item is saved; the photo can be added again from its record.
+        }
+      }
       onSaved({ tone: 'green', title: `Item recorded as ${item.storage_label}`, text: `Label the item ${item.storage_label} and store it at ${item.storage_location}.` }, item.item_id, item)
     } catch (err) {
       setError(err.message)
@@ -183,9 +226,13 @@ function NewItemForm({ rooms, onSaved }) {
           <textarea rows={2} value={form.description} onChange={set('description')} placeholder="Colour, brand, contents" />
         </Field>
         <Field label="Storage location" wide>
-          <input value={form.storageLocation} onChange={set('storageLocation')} placeholder="e.g. Cabinet A - Shelf 1" />
+          <input value={form.storageLocation} onChange={set('storageLocation')} maxLength={100} placeholder="e.g. Cabinet A - Shelf 1" />
+        </Field>
+        <Field label="Photo (optional)" wide>
+          <PhotoPicker onPick={setPhoto} onError={setError} />
         </Field>
       </div>
+      {photo && <img className="hk-photo-preview" src={photo} alt="Selected item" />}
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
       <div className="hk-actions">
         <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !form.description || !form.foundLocation || !form.storageLocation} onClick={save}>
@@ -196,13 +243,16 @@ function NewItemForm({ rooms, onSaved }) {
   )
 }
 
-function ItemDetail({ item, onSaved }) {
+function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
   const [form, setForm] = useState({ description: item.item_description, storageLocation: item.storage_location })
-  const [claim, setClaim] = useState({ claimantName: '', claimantContact: '', idVerified: false, descriptionMatch: false })
+  const [claim, setClaim] = useState({ claimantName: '', claimantContact: '', idType: '', idNumber: '', idVerified: false, descriptionMatch: false })
+  const [disposeReason, setDisposeReason] = useState('')
+  const [photos, setPhotos] = useState(item.photo_ids || [])
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const stored = item.item_status === 'STORED'
-  const verified = claim.idVerified && claim.descriptionMatch
+  const idRecorded = Boolean(claim.idType && claim.idNumber.trim().length >= 4)
+  const verified = claim.idVerified && idRecorded && claim.descriptionMatch
   const hasClaimant = claim.claimantName && claim.claimantContact
   const releaseReady = Boolean(hasClaimant && verified)
 
@@ -225,6 +275,27 @@ function ItemDetail({ item, onSaved }) {
       return { message: { tone: 'green', title: 'Item details updated.' }, item: res.item }
     })
 
+  // Adding a photo keeps this window open; the list picks it up on its next refresh.
+  async function addPhoto(image) {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await api.addItemPhoto(item.item_id, image)
+      setPhotos((current) => [...current, res.photo.photo_id])
+      onPhotoAdded?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const dispose = () =>
+    run(async () => {
+      const res = await api.disposeItem(item.item_id, { reason: disposeReason })
+      return { message: { tone: 'green', title: `${item.storage_label} marked as disposed.`, text: 'The reason and your name are kept on the record.' }, item: res.item }
+    })
+
   const processClaim = () =>
     run(async () => {
       const res = await api.claimItem(item.item_id, claim)
@@ -239,6 +310,13 @@ function ItemDetail({ item, onSaved }) {
   return (
     <Card title={`Found item · ${item.storage_label}`} subtitle={`Recorded by ${item.found_by_name}`}>
       <div className="hk-badges"><Badge value={item.item_status} /></div>
+      <h3 className="hk-subhead">Photos</h3>
+      {photos.length ? <PhotoStrip item={{ ...item, photo_ids: photos }} /> : <p className="hk-muted">No photos yet.</p>}
+      {stored && photos.length < 3 && (
+        <div className="hk-actions hk-actions--left">
+          <PhotoPicker onPick={addPhoto} onError={setError} label="Add photo" />
+        </div>
+      )}
       <div className="hk-form">
         <Field label="Found date / time">
           <input value={formatDateTime(item.found_at)} disabled />
@@ -264,13 +342,22 @@ function ItemDetail({ item, onSaved }) {
             <Field label="Claimant name">
               <input value={claim.claimantName} onChange={(e) => setClaim({ ...claim, claimantName: e.target.value })} />
             </Field>
-            <Field label="Contact / ID number">
+            <Field label="Contact number or email">
               <input value={claim.claimantContact} onChange={(e) => setClaim({ ...claim, claimantContact: e.target.value })} />
+            </Field>
+            <Field label="ID presented">
+              <select value={claim.idType} onChange={(e) => setClaim({ ...claim, idType: e.target.value })}>
+                <option value="">Select ID type</option>
+                {ID_TYPES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="ID number">
+              <input value={claim.idNumber} onChange={(e) => setClaim({ ...claim, idNumber: e.target.value })} autoComplete="off" placeholder="Only the last 4 characters are saved" />
             </Field>
           </div>
           <label className="hk-check">
             <input type="checkbox" checked={claim.idVerified} onChange={(e) => setClaim({ ...claim, idVerified: e.target.checked })} />
-            Valid ID checked
+            The ID is valid and matches the claimant
           </label>
           <label className="hk-check">
             <input type="checkbox" checked={claim.descriptionMatch} onChange={(e) => setClaim({ ...claim, descriptionMatch: e.target.checked })} />
@@ -280,7 +367,7 @@ function ItemDetail({ item, onSaved }) {
             <Notice tone="green" title="Valid claim">The item can be released to the claimant.</Notice>
           ) : (
             <Notice tone="amber" title="Release blocked - verification incomplete">
-              Enter the claimant details, check a valid ID, and confirm that the description matches before releasing the item.
+              Enter the claimant details, record the ID type and number, check the ID, and confirm that the description matches before releasing the item.
             </Notice>
           )}
         </>
@@ -297,6 +384,146 @@ function ItemDetail({ item, onSaved }) {
           </button>
         </div>
       )}
+      {stored && supervisor && (
+        <>
+          <h3 className="hk-subhead">Dispose of unclaimed item</h3>
+          <Field label="Reason (kept on the record)" wide>
+            <input value={disposeReason} onChange={(e) => setDisposeReason(e.target.value)} maxLength={255} placeholder="e.g. Unclaimed after 90 days, donated to charity" />
+          </Field>
+          <div className="hk-actions">
+            <button type="button" className="hk-btn hk-btn--danger" disabled={busy || !disposeReason.trim()} onClick={dispose}>
+              Mark as disposed
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
+  )
+}
+
+// Picks an image, shrinks it to at most 1280 px on the long side and returns a
+// JPEG data URL (usually well under the 2 MB limit).
+function PhotoPicker({ onPick, onError, label: text = 'Choose photo' }) {
+  const input = useRef(null)
+
+  async function pick(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      onError('Choose a JPEG, PNG or WebP photo.')
+      return
+    }
+    try {
+      onPick(await shrink(file))
+    } catch {
+      onError('That photo could not be read.')
+    }
+  }
+
+  return (
+    <>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onChange={pick} />
+      <button type="button" className="hk-btn hk-btn--secondary" onClick={() => input.current.click()}>{text}</button>
+    </>
+  )
+}
+
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, 1280 / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('unreadable'))
+    }
+    img.src = url
+  })
+}
+
+// Item photos are protected, so they are loaded with the session token.
+function PhotoStrip({ item }) {
+  return (
+    <div className="hk-photos">
+      {item.photo_ids.map((id) => <ItemPhoto key={id} path={api.itemPhotoPath(item.item_id, id)} alt={item.item_description} />)}
+    </div>
+  )
+}
+
+function ItemPhoto({ path, alt }) {
+  const [src, setSrc] = useState(null)
+  useEffect(() => {
+    let url = null
+    let active = true
+    fetchImage(path)
+      .then((u) => {
+        url = u
+        if (active) setSrc(u)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [path])
+  return src ? (
+    <a href={src} target="_blank" rel="noreferrer" className="hk-photos__item"><img src={src} alt={alt} /></a>
+  ) : (
+    <span className="hk-photos__item hk-photos__item--loading" aria-label="Loading photo" />
+  )
+}
+
+// Storage label with a QR code. Scanning it shows the label and description,
+// so the item can be matched to its record. Printed on its own page.
+function ItemLabel({ item }) {
+  const [qr, setQr] = useState(null)
+  useEffect(() => {
+    let active = true
+    import('qrcode')
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(`HOSIS LOST & FOUND\n${item.storage_label}\n${item.item_description}`, { margin: 1, width: 240 })
+      )
+      .then((data) => active && setQr(data))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [item])
+
+  function print() {
+    document.body.classList.add('hk-printing-label')
+    const done = () => {
+      document.body.classList.remove('hk-printing-label')
+      window.removeEventListener('afterprint', done)
+    }
+    window.addEventListener('afterprint', done)
+    window.print()
+  }
+
+  return (
+    <Card title="Storage label" subtitle="Print and attach it to the item or its bag">
+      <div className="hk-print-label">
+        {qr ? <img src={qr} alt={`QR code for ${item.storage_label}`} /> : <span className="hk-print-label__qr-wait">Making QR code...</span>}
+        <div>
+          <strong className="hk-print-label__code">{item.storage_label}</strong>
+          <span>{item.item_description}</span>
+          <small>Found {formatDateTime(item.found_at)}{item.room_number ? ` · Room ${item.room_number}` : ''}</small>
+          <small>Store at: {item.storage_location}</small>
+          <small>Grand Horizon Hotel · Housekeeping Lost &amp; Found</small>
+        </div>
+      </div>
+      <div className="hk-actions">
+        <button type="button" className="hk-btn hk-btn--primary" disabled={!qr} onClick={print}>Print label</button>
+      </div>
     </Card>
   )
 }
