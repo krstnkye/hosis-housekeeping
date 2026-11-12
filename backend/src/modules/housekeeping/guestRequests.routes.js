@@ -8,6 +8,13 @@ const router = express.Router();
 
 const REQUEST_TYPES = ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER'];
 
+// Supervisors (and inspectors, who lead the floor) may assign any request.
+// A housekeeper may take an unassigned request for themselves and work on
+// their own requests, but cannot reassign or close someone else's.
+function canManage(user) {
+  return user.role === 'ADMIN' || ['SUPERVISOR', 'INSPECTOR'].includes(user.position);
+}
+
 const REQUEST_SELECT = `
   SELECT q.*, r.room_number,
          CONCAT(g.first_name, ' ', g.last_name) AS guest_name,
@@ -47,7 +54,11 @@ router.post('/', async (req, res) => {
   v.required(body, ['roomId', 'requestType', 'details']);
   v.oneOf(body.requestType, REQUEST_TYPES, 'requestType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { details: [255, 'Details'] });
   const staffId = v.optionalId(body.staffId, 'staff');
+  if (staffId && staffId !== req.user.userId && !canManage(req.user)) {
+    throw new HttpError(403, 'Only a supervisor can assign a request to someone else. Leave it unassigned or assign it to yourself.');
+  }
   if (staffId) {
     await assertHousekeepingStaff(db, staffId, 'Guest requests can only be assigned to active housekeeping staff.');
   }
@@ -66,6 +77,7 @@ router.patch('/:id', async (req, res) => {
   const body = req.body;
   v.oneOf(body.requestType, REQUEST_TYPES, 'requestType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { details: [255, 'Details'] });
   const { rows: found } = await db.query('SELECT * FROM hk_guest_requests WHERE request_id = $1', [requestId]);
   const current = found[0];
   if (!current) {
@@ -75,6 +87,14 @@ router.patch('/:id', async (req, res) => {
     throw new HttpError(409, 'This request is already completed.');
   }
   const staffId = body.staffId !== undefined ? v.optionalId(body.staffId, 'staff') : current.staff_id;
+  if (!canManage(req.user)) {
+    if (current.staff_id && current.staff_id !== req.user.userId) {
+      throw new HttpError(403, 'This request is assigned to another staff member. Ask a supervisor to reassign it.');
+    }
+    if (staffId && staffId !== req.user.userId) {
+      throw new HttpError(403, 'Only a supervisor can assign a request to someone else.');
+    }
+  }
   if (staffId && staffId !== current.staff_id) {
     await assertHousekeepingStaff(db, staffId, 'Guest requests can only be assigned to active housekeeping staff.');
   }
@@ -91,12 +111,17 @@ router.patch('/:id', async (req, res) => {
 // HK-014: complete the request.
 router.post('/:id/complete', async (req, res) => {
   const requestId = v.id(req.params.id, 'request id');
+  v.maxLengths(req.body || {}, { completionNotes: [255, 'Completion notes'] });
+  const { rows: found } = await db.query('SELECT staff_id FROM hk_guest_requests WHERE request_id = $1', [requestId]);
+  if (found[0] && found[0].staff_id && found[0].staff_id !== req.user.userId && !canManage(req.user)) {
+    throw new HttpError(403, 'Only the assigned staff member or a supervisor can complete this request.');
+  }
   const { rows } = await db.query(
     `UPDATE hk_guest_requests
         SET request_status = 'COMPLETED', completed_at = NOW(), completion_notes = $1,
             staff_id = COALESCE(staff_id, $2)
       WHERE request_id = $3 AND request_status <> 'COMPLETED' RETURNING *`,
-    [req.body.completionNotes || null, req.user.userId, requestId]
+    [(req.body && req.body.completionNotes) || null, req.user.userId, requestId]
   );
   if (!rows[0]) {
     throw new HttpError(409, 'Request not found or already completed.');

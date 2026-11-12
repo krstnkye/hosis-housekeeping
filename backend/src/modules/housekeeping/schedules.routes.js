@@ -7,22 +7,63 @@ const { requirePosition } = require('../../middleware/auth');
 const router = express.Router();
 
 const SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT'];
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
+const { DATE_RE, TIME_RE } = v;
 
 function checkSchedule(body) {
   v.oneOf(body.shift, SHIFTS, 'shift');
-  if (body.shiftDate !== undefined && !DATE_RE.test(body.shiftDate)) {
-    throw new HttpError(400, 'shiftDate must be in YYYY-MM-DD format.');
+  if (body.shiftDate !== undefined && body.shiftDate !== null) {
+    v.date(body.shiftDate, 'Shift date');
   }
   for (const f of ['startTime', 'endTime']) {
     if (body[f] !== undefined && !TIME_RE.test(body[f])) {
       throw new HttpError(400, `${f} must be in HH:MM format.`);
     }
   }
+  v.maxLengths(body, { assignedArea: [100, 'Assigned area'], notes: [255, 'Notes'] });
   // Only the night shift may cross midnight.
   if (body.startTime && body.endTime && body.shift !== 'NIGHT' && body.endTime <= body.startTime) {
     throw new HttpError(400, 'Shift end time must be after the start time.');
+  }
+}
+
+// Minutes from midnight; a shift that ends at or before it starts runs past
+// midnight (night shift), so its end moves to the next day.
+function range(start, end) {
+  const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const s = toMin(start);
+  let e = toMin(end);
+  if (e <= s) e += 24 * 60;
+  return [s, e];
+}
+
+// A staff member cannot be on two shifts at the same time. Shifts on the day
+// before are checked too, because a night shift can run into this day.
+async function assertNoOverlap({ staffId, shiftDate, startTime, endTime, ignoreId = null }) {
+  const { rows } = await db.query(
+    `SELECT schedule_id, shift, TO_CHAR(shift_date, 'YYYY-MM-DD') AS shift_date,
+            TO_CHAR(start_time, 'HH24:MI') AS start_time, TO_CHAR(end_time, 'HH24:MI') AS end_time,
+            (shift_date - $2::date) AS day_offset
+       FROM hk_schedules
+      WHERE staff_id = $1 AND shift_date BETWEEN $2::date - 1 AND $2::date + 1
+        AND ($3::int IS NULL OR schedule_id <> $3)`,
+    [staffId, shiftDate, ignoreId]
+  );
+  const [s, e] = range(startTime, endTime);
+  for (const other of rows) {
+    const [os, oe] = range(other.start_time, other.end_time);
+    const shift = other.day_offset * 24 * 60;
+    if (s < oe + shift && os + shift < e) {
+      throw new HttpError(
+        409,
+        `This overlaps the ${other.shift.toLowerCase()} shift on ${other.shift_date} (${other.start_time}-${other.end_time}) for the same staff member.`
+      );
+    }
+  }
+}
+
+function assertNotPast(shiftDate) {
+  if (shiftDate < db.today()) {
+    throw new HttpError(400, 'Shifts cannot be created or moved to a date that has already passed.');
   }
 }
 
@@ -89,14 +130,16 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
   const body = req.body;
   v.required(body, ['staffId', 'shiftDate', 'shift', 'startTime', 'endTime', 'assignedArea']);
   checkSchedule(body);
+  assertNotPast(body.shiftDate);
   const staffId = v.id(body.staffId, 'staff');
   const { rows: staff } = await db.query(
-    `SELECT user_id FROM users WHERE user_id = $1 AND role = 'HOUSEKEEPING'`,
+    `SELECT user_id FROM users WHERE user_id = $1 AND role = 'HOUSEKEEPING' AND employment_status = 'ACTIVE'`,
     [staffId]
   );
   if (!staff[0]) {
-    throw new HttpError(400, 'Schedules can only be created for housekeeping staff.');
+    throw new HttpError(400, 'Schedules can only be created for active housekeeping staff.');
   }
+  await assertNoOverlap({ staffId, shiftDate: body.shiftDate, startTime: body.startTime, endTime: body.endTime });
   const { rows } = await db.query(
     `INSERT INTO hk_schedules (staff_id, shift_date, shift, start_time, end_time, assigned_area, notes)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -108,7 +151,10 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
 // HK-009: update a schedule entry.
 router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
   const scheduleId = v.id(req.params.id, 'schedule id');
-  const { rows: found } = await db.query('SELECT * FROM hk_schedules WHERE schedule_id = $1', [scheduleId]);
+  const { rows: found } = await db.query(
+    `SELECT *, TO_CHAR(shift_date, 'YYYY-MM-DD') AS shift_date_text FROM hk_schedules WHERE schedule_id = $1`,
+    [scheduleId]
+  );
   const current = found[0];
   if (!current) {
     throw new HttpError(404, 'Schedule not found.');
@@ -119,7 +165,19 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
     startTime: req.body.startTime || current.start_time.slice(0, 5),
     endTime: req.body.endTime || current.end_time.slice(0, 5),
   };
-  checkSchedule(merged);
+  checkSchedule({ ...merged, assignedArea: req.body.assignedArea, notes: req.body.notes });
+  // Moving a shift to another day must not move it into the past. Editing the
+  // notes or area of a shift that already happened is still allowed.
+  if (merged.shiftDate && merged.shiftDate !== current.shift_date_text) {
+    assertNotPast(merged.shiftDate);
+  }
+  await assertNoOverlap({
+    staffId: current.staff_id,
+    shiftDate: merged.shiftDate || current.shift_date_text,
+    startTime: merged.startTime,
+    endTime: merged.endTime,
+    ignoreId: scheduleId,
+  });
   const { rows } = await db.query(
     `UPDATE hk_schedules
         SET shift_date = COALESCE($1, shift_date), shift = $2, start_time = $3, end_time = $4,

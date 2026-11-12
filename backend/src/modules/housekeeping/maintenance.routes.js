@@ -38,6 +38,7 @@ router.post('/', async (req, res) => {
   v.required(body, ['roomId', 'category', 'description']);
   v.oneOf(body.category, CATEGORIES, 'category');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { description: [255, 'Description'] });
   const roomId = v.id(body.roomId, 'room');
   const setOutOfOrder = body.setOutOfOrder === true;
 
@@ -78,6 +79,7 @@ router.patch('/:id', async (req, res) => {
     throw new HttpError(403, 'Only Engineering can update the repair status.');
   }
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { description: [255, 'Description'] });
   const { rows } = await db.query(
     `UPDATE hk_maintenance_requests
         SET priority = COALESCE($1, priority),

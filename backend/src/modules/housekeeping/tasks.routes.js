@@ -89,6 +89,8 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
   v.required(body, ['roomId', 'taskType']);
   v.oneOf(body.taskType, TASK_TYPES, 'taskType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { notes: [255, 'Notes'] });
+  const dueTime = v.optionalTime(body.dueTime, 'Due time');
   const roomId = v.id(body.roomId, 'room');
   const staffId = v.optionalId(body.staffId, 'housekeeper');
 
@@ -114,7 +116,7 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
       `INSERT INTO hk_cleaning_tasks (room_id, staff_id, task_type, priority, task_status, notes, due_time)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [roomId, staffId, body.taskType, body.priority || 'NORMAL', staffId ? 'ASSIGNED' : 'PENDING',
-        body.notes || null, body.dueTime || null]
+        body.notes || null, dueTime]
     );
     return rows[0];
   });
@@ -127,6 +129,8 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
   const body = req.body;
   v.oneOf(body.taskType, TASK_TYPES, 'taskType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { notes: [255, 'Notes'] });
+  if (body.dueTime !== undefined) v.optionalTime(body.dueTime, 'Due time');
 
   const task = await db.withTransaction(async (client) => {
     const current = await getTask(client, taskId, true);

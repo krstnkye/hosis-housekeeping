@@ -73,4 +73,66 @@ router.post('/checkout', authorize('FRONT_OFFICE'), async (req, res) => {
   res.status(result.created ? 201 : 200).json(result);
 });
 
+// ---------------------------------------------------------------------
+// Front Office stand-ins. Front Office owns AVAILABLE, RESERVED and OCCUPIED.
+// Until the Front Office module exists, these let the demo finish the room
+// cycle (npm run frontoffice). The combined HOSIS app should replace them with
+// the Front Office module's own check-in and room release.
+// ---------------------------------------------------------------------
+
+// GET /api/housekeeping/front-office/rooms: every room and its status.
+router.get('/front-office/rooms', authorize('FRONT_OFFICE'), async (req, res) => {
+  const { rows } = await db.query('SELECT room_id, room_number, room_type, room_status FROM rooms ORDER BY room_number');
+  res.json({ rooms: rows });
+});
+
+// POST /api/housekeeping/front-office/release  { roomId }
+// Front Office puts an INSPECTED room back on sale: INSPECTED -> AVAILABLE,
+// and its "room ready" notices are marked read.
+router.post('/front-office/release', authorize('FRONT_OFFICE'), async (req, res) => {
+  v.required(req.body || {}, ['roomId']);
+  const roomId = v.id(req.body.roomId, 'room');
+  const room = await db.withTransaction(async (client) => {
+    const current = await lockRoom(client, roomId);
+    if (current.room_status !== 'INSPECTED') {
+      throw new HttpError(409, `Room ${current.room_number} is ${current.room_status}. Only INSPECTED rooms can be released.`);
+    }
+    const updated = await changeRoomStatus(client, {
+      roomId,
+      newStatus: 'AVAILABLE',
+      staffId: req.user.userId,
+      remarks: 'Released for sale (Front Office)',
+      manual: false,
+    });
+    await client.query(
+      `UPDATE hk_front_office_notifications SET read_at = NOW()
+        WHERE room_id = $1 AND notice_type = 'ROOM_READY' AND read_at IS NULL`,
+      [roomId]
+    );
+    return updated;
+  });
+  res.json({ room });
+});
+
+// POST /api/housekeeping/front-office/check-in  { roomId }
+// A guest checks in: AVAILABLE or RESERVED -> OCCUPIED.
+router.post('/front-office/check-in', authorize('FRONT_OFFICE'), async (req, res) => {
+  v.required(req.body || {}, ['roomId']);
+  const roomId = v.id(req.body.roomId, 'room');
+  const room = await db.withTransaction(async (client) => {
+    const current = await lockRoom(client, roomId);
+    if (!['AVAILABLE', 'RESERVED'].includes(current.room_status)) {
+      throw new HttpError(409, `Room ${current.room_number} is ${current.room_status}. Only AVAILABLE or RESERVED rooms can be checked in.`);
+    }
+    return changeRoomStatus(client, {
+      roomId,
+      newStatus: 'OCCUPIED',
+      staffId: req.user.userId,
+      remarks: 'Guest checked in (Front Office)',
+      manual: false,
+    });
+  });
+  res.json({ room });
+});
+
 module.exports = router;
