@@ -3,7 +3,7 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
 const { requirePosition } = require('../../middleware/auth');
-const { changeRoomStatus, assertNotOutOfOrder } = require('./roomStatus');
+const { changeRoomStatus, assertNotOutOfOrder, FRONT_OFFICE_HELD } = require('./roomStatus');
 
 const router = express.Router();
 
@@ -74,7 +74,11 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
     if (task.staff_id === req.user.userId) {
       throw new HttpError(409, 'You cleaned this room, so another inspector or supervisor must inspect it.');
     }
-    await assertNotOutOfOrder(client, task.room_id);
+    const current = await assertNotOutOfOrder(client, task.room_id);
+    const guestRoom = FRONT_OFFICE_HELD.includes(current.room_status);
+    if (!guestRoom && current.room_status !== 'CLEAN') {
+      throw new HttpError(409, `Room ${current.room_number} is ${current.room_status}, not CLEAN. It must be cleaned again before inspection.`);
+    }
     const { rows } = await client.query(
       `INSERT INTO hk_inspections (task_id, inspected_by, inspection_result, checklist, remarks)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -85,6 +89,10 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
       passed ? 'INSPECTED' : 'RETURNED',
       taskId,
     ]);
+    // A guest's room (stayover) keeps its Front Office status either way.
+    if (guestRoom) {
+      return { inspection: rows[0], room: current };
+    }
     const room = await changeRoomStatus(client, {
       roomId: task.room_id,
       newStatus: passed ? 'INSPECTED' : 'DIRTY',

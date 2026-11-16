@@ -15,7 +15,12 @@ function errorHandler(err, req, res, _next) {
   switch (err.code) {
     case '23505':
       return res.status(409).json({ error: 'A record with the same details already exists.' });
-    case '23503':
+    case '23503': {
+      // e.g. Key (room_id)=(999) is not present in table "rooms".
+      const m = /Key \((\w+?)(?:_id)?\)=/.exec(err.detail || '');
+      const what = m ? m[1].replace(/_/g, ' ') : 'record';
+      return res.status(400).json({ error: `The selected ${what} does not exist.` });
+    }
     case '23514':
       return res.status(400).json({ error: 'Invalid value: ' + (err.detail || err.message) });
     case '22001':

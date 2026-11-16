@@ -3,7 +3,7 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
 const { requirePosition } = require('../../middleware/auth');
-const { changeRoomStatus, assertNotOutOfOrder } = require('./roomStatus');
+const { changeRoomStatus, assertNotOutOfOrder, FRONT_OFFICE_HELD } = require('./roomStatus');
 const { assertHousekeepingStaff } = require('./staff');
 
 const router = express.Router();
@@ -140,6 +140,9 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
     let staffId = current.staff_id;
     if (body.staffId !== undefined) {
       staffId = v.optionalId(body.staffId, 'housekeeper');
+      if (!staffId && ['IN_PROGRESS', 'COMPLETED', 'RETURNED'].includes(current.task_status)) {
+        throw new HttpError(409, 'This task is already being worked on. Reassign it to another housekeeper instead of leaving it unassigned.');
+      }
       if (staffId) {
         await assertHousekeepingStaff(client, staffId);
       }
@@ -200,12 +203,16 @@ router.post('/:id/complete', async (req, res) => {
       throw new HttpError(409, 'Only a task that is in progress can be marked complete.');
     }
     // A room set OUT OF ORDER while it was being cleaned must not become CLEAN.
-    await assertNotOutOfOrder(client, current.room_id);
+    const room = await assertNotOutOfOrder(client, current.room_id);
     const { rows } = await client.query(
       `UPDATE hk_cleaning_tasks SET task_status = 'COMPLETED', completion_time = NOW()
         WHERE task_id = $1 RETURNING *`,
       [taskId]
     );
+    // A guest's room (stayover, touch-up) stays OCCUPIED or RESERVED.
+    if (FRONT_OFFICE_HELD.includes(room.room_status)) {
+      return rows[0];
+    }
     await changeRoomStatus(client, {
       roomId: current.room_id,
       newStatus: 'CLEAN',

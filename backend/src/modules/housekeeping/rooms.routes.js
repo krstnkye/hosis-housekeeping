@@ -87,14 +87,22 @@ router.patch('/:id/status', async (req, res) => {
   if (req.body.status === 'OUT_OF_ORDER') {
     throw new HttpError(409, 'Report the problem on the Maintenance page to set a room OUT OF ORDER.');
   }
-  const room = await db.withTransaction((client) =>
-    changeRoomStatus(client, {
+  const room = await db.withTransaction(async (client) => {
+    const updated = await changeRoomStatus(client, {
       roomId,
       newStatus: req.body.status,
       staffId: req.user.userId,
       remarks: req.body.remarks,
-    })
-  );
+    });
+    // A room marked DIRTY again while its cleaning waits for inspection goes
+    // back to the housekeeper, so it cannot pass inspection while dirty.
+    await client.query(
+      `UPDATE hk_cleaning_tasks SET task_status = 'RETURNED'
+        WHERE room_id = $1 AND task_status = 'COMPLETED'`,
+      [roomId]
+    );
+    return updated;
+  });
   res.json({ room });
 });
 

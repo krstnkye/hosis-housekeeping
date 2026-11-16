@@ -158,9 +158,17 @@ test('room status: only allowed manual changes', async () => {
     body: { status: 'AVAILABLE' },
   });
   assert.equal(bad.status, 409);
-  const ok = await api('PATCH', `/housekeeping/rooms/${occupied}/status`, {
+  // Only Front Office's check-out makes an occupied room DIRTY.
+  const guestInside = await api('PATCH', `/housekeeping/rooms/${occupied}/status`, {
     token: liza.token,
     body: { status: 'DIRTY', remarks: 'Guest asked for service' },
+  });
+  assert.equal(guestInside.status, 409);
+  assert.equal(await roomStatus(occupied), 'OCCUPIED');
+  const vacant = await roomId('101');
+  const ok = await api('PATCH', `/housekeeping/rooms/${vacant}/status`, {
+    token: liza.token,
+    body: { status: 'DIRTY', remarks: 'Spill found during walk-through' },
   });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.room.room_status, 'DIRTY');
@@ -778,4 +786,74 @@ test('front office stand-ins: release an inspected room and check a guest in', a
   assert.equal(checkIn.body.room.room_status, 'OCCUPIED');
   const sup = await login('hk.supervisor');
   assert.equal((await api('POST', '/housekeeping/front-office/check-in', { token: sup.token, body: { roomId: room } })).status, 403);
+});
+
+test('stayover: cleaning an occupied room keeps it OCCUPIED and never offers it for sale', async () => {
+  const sup = await login('hk.supervisor');
+  const ins = await login('hk.inspector');
+  const joy = await login('hk.joy');
+  const room = await roomId('301');
+  assert.equal(await roomStatus(room), 'OCCUPIED');
+  await db.query(`UPDATE hk_cleaning_tasks SET task_status = 'INSPECTED' WHERE room_id = $1`, [room]);
+  const created = await api('POST', '/housekeeping/tasks', {
+    token: sup.token,
+    body: { roomId: room, taskType: 'STAYOVER', staffId: joy.user.userId },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const taskId = created.body.task.task_id;
+  assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: joy.token })).status, 200);
+  assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: joy.token })).status, 200);
+  assert.equal(await roomStatus(room), 'OCCUPIED');
+  const before = await db.query('SELECT COUNT(*)::int AS n FROM hk_front_office_notifications WHERE room_id = $1', [room]);
+  const passed = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED' } });
+  assert.equal(passed.status, 201, JSON.stringify(passed.body));
+  assert.equal(await roomStatus(room), 'OCCUPIED');
+  const after = await db.query('SELECT COUNT(*)::int AS n FROM hk_front_office_notifications WHERE room_id = $1', [room]);
+  assert.equal(after.rows[0].n, before.rows[0].n);
+  // Front Office can still check the guest out normally.
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  assert.equal((await api('POST', '/housekeeping/checkout', { token: fo.body.token, body: { roomId: room } })).status, 201);
+});
+
+test('inspection: a room marked DIRTY again goes back to the housekeeper', async () => {
+  const sup = await login('hk.supervisor');
+  const ins = await login('hk.inspector');
+  const queue = await api('GET', '/housekeeping/inspections/queue', { token: sup.token });
+  const waiting = queue.body.queue.find((q) => q.room_status === 'CLEAN');
+  assert.ok(waiting);
+  const marked = await api('PATCH', `/housekeeping/rooms/${waiting.room_id}/status`, {
+    token: sup.token,
+    body: { status: 'DIRTY', remarks: 'Spill after cleaning' },
+  });
+  assert.equal(marked.status, 200);
+  const task = await api('GET', `/housekeeping/tasks/${waiting.task_id}`, { token: sup.token });
+  assert.equal(task.body.task.task_status, 'RETURNED');
+  const inspect = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId: waiting.task_id, result: 'PASSED' } });
+  assert.equal(inspect.status, 409);
+  assert.equal(await roomStatus(waiting.room_id), 'DIRTY');
+});
+
+test('tasks: a task being worked on cannot be left without a housekeeper', async () => {
+  const sup = await login('hk.supervisor');
+  const { rows } = await db.query(`SELECT task_id FROM hk_cleaning_tasks WHERE task_status = 'IN_PROGRESS' LIMIT 1`);
+  assert.ok(rows[0]);
+  const res = await api('PATCH', `/housekeeping/tasks/${rows[0].task_id}`, { token: sup.token, body: { staffId: null } });
+  assert.equal(res.status, 409);
+});
+
+test('api: dates are plain YYYY-MM-DD, blank text is refused, unknown rooms get a clear message', async () => {
+  const sup = await login('hk.supervisor');
+  const tasks = await api('GET', '/housekeeping/tasks', { token: sup.token });
+  assert.match(tasks.body.tasks[0].assigned_date, /^\d{4}-\d{2}-\d{2}$/);
+  const blank = await api('POST', '/housekeeping/lost-found', {
+    token: sup.token,
+    body: { description: '   ', foundLocation: 'Lobby', storageLocation: 'Cabinet A' },
+  });
+  assert.equal(blank.status, 400);
+  const missing = await api('POST', '/housekeeping/guest-requests', {
+    token: sup.token,
+    body: { roomId: 99999, requestType: 'TOWELS', details: 'Two towels' },
+  });
+  assert.equal(missing.status, 400);
+  assert.equal(missing.body.error, 'The selected room does not exist.');
 });
