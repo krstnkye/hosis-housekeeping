@@ -12,12 +12,18 @@ const ROOM_STATUSES = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'DIRTY', 'CLEAN', 'I
 const MANUAL_TRANSITIONS = {
   AVAILABLE: ['DIRTY'],
   RESERVED: [],
-  OCCUPIED: ['DIRTY'],
+  // Only Front Office's check-out (POST /checkout) makes an occupied room DIRTY.
+  OCCUPIED: [],
   DIRTY: [],
   CLEAN: ['DIRTY'],
   INSPECTED: ['DIRTY'],
   OUT_OF_ORDER: [],
 };
+
+// Rooms that Front Office holds for a guest. Cleaning them (stayover, touch-up)
+// does not change their status: the guest is still there, so the room must not
+// become CLEAN, INSPECTED and then AVAILABLE for sale.
+const FRONT_OFFICE_HELD = ['OCCUPIED', 'RESERVED'];
 
 async function lockRoom(client, roomId) {
   const { rows } = await client.query('SELECT * FROM rooms WHERE room_id = $1 FOR UPDATE', [roomId]);
@@ -93,6 +99,7 @@ async function assertNotOutOfOrder(client, roomId) {
 module.exports = {
   ROOM_STATUSES,
   MANUAL_TRANSITIONS,
+  FRONT_OFFICE_HELD,
   changeRoomStatus,
   lockRoom,
   notifyFrontOffice,

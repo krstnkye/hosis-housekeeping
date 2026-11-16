@@ -3,7 +3,9 @@ const HttpError = require('../../utils/httpError');
 // Small helpers that check request input before it reaches the database (SYS-006).
 
 function required(body, fields) {
-  const missing = fields.filter((f) => body[f] === undefined || body[f] === null || body[f] === '');
+  const missing = fields.filter(
+    (f) => body[f] === undefined || body[f] === null || (typeof body[f] === 'string' && body[f].trim() === '')
+  );
   if (missing.length) {
     throw new HttpError(400, `Missing required field(s): ${missing.join(', ')}`);
   }
