@@ -76,7 +76,7 @@ function requirePosition(...positions) {
     if (req.user.role === 'ADMIN' || positions.includes(req.user.position)) {
       return next();
     }
-    next(new HttpError(403, `Only ${positions.join(' or ').toLowerCase()}s can perform this action.`));
+    next(new HttpError(403, `Only ${positions.map((p) => `${p.toLowerCase()}s`).join(' or ')} can perform this action.`));
   };
 }
 

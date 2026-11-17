@@ -61,7 +61,18 @@ router.post('/checkout', authorize('FRONT_OFFICE'), async (req, res) => {
       [roomId]
     );
     if (open[0]) {
-      return { room: updated, task: open[0], created: false };
+      // The guest has left, so the open task (often a stayover) becomes a full
+      // checkout clean. One that was already cleaned and waiting for
+      // inspection goes back to the housekeeper: the room is DIRTY again and
+      // could otherwise never pass or fail inspection.
+      const { rows: task } = await client.query(
+        `UPDATE hk_cleaning_tasks
+            SET task_type = 'CHECKOUT',
+                task_status = CASE WHEN task_status = 'COMPLETED' THEN 'RETURNED' ELSE task_status END
+          WHERE task_id = $1 RETURNING *`,
+        [open[0].task_id]
+      );
+      return { room: updated, task: task[0], created: false };
     }
     const { rows } = await client.query(
       `INSERT INTO hk_cleaning_tasks (room_id, task_type, priority, notes)

@@ -44,6 +44,16 @@ function maxLengths(body, limits) {
   }
 }
 
+// Fields that may be left out of an edit, but not cleared to blank text.
+function notBlank(body, fields) {
+  for (const [field, label] of Object.entries(fields)) {
+    const value = body[field];
+    if (typeof value === 'string' && value.trim() === '') {
+      throw new HttpError(400, `${label} cannot be blank.`);
+    }
+  }
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
@@ -95,6 +105,6 @@ function int(value, label, { min = 0, max = 100000 } = {}) {
 const PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
 
 module.exports = {
-  required, oneOf, id, optionalId, maxLengths, date, optionalTime, optionalPastDateTime, int, isRealDate,
+  required, notBlank, oneOf, id, optionalId, maxLengths, date, optionalTime, optionalPastDateTime, int, isRealDate,
   DATE_RE, TIME_RE, PRIORITIES,
 };

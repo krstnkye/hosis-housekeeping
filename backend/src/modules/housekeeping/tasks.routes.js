@@ -143,6 +143,9 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
       if (!staffId && ['IN_PROGRESS', 'COMPLETED', 'RETURNED'].includes(current.task_status)) {
         throw new HttpError(409, 'This task is already being worked on. Reassign it to another housekeeper instead of leaving it unassigned.');
       }
+      if (staffId && staffId !== current.staff_id && current.task_status === 'COMPLETED') {
+        throw new HttpError(409, 'This room is already cleaned and waiting for inspection, so its housekeeper cannot be changed.');
+      }
       if (staffId) {
         await assertHousekeepingStaff(client, staffId);
       }
@@ -153,7 +156,9 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
 
     const { rows } = await client.query(
       `UPDATE hk_cleaning_tasks
-          SET staff_id = $1, task_type = $2, priority = $3, notes = $4, due_time = $5, task_status = $6
+          SET staff_id = $1, task_type = $2, priority = $3, notes = $4, due_time = $5, task_status = $6,
+              -- Work handed to someone counts on the day it was handed over.
+              assigned_date = CASE WHEN staff_id IS DISTINCT FROM $1 AND $1::int IS NOT NULL THEN CURRENT_DATE ELSE assigned_date END
         WHERE task_id = $7 RETURNING *`,
       [staffId, body.taskType || current.task_type, body.priority || current.priority,
         body.notes !== undefined ? body.notes || null : current.notes,

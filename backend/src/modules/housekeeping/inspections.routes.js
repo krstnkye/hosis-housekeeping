@@ -52,7 +52,7 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
   v.required(body, ['taskId', 'result']);
   v.oneOf(body.result, ['PASSED', 'FAILED'], 'result');
   const taskId = v.id(body.taskId, 'task id');
-  if (body.result === 'FAILED' && !body.remarks) {
+  if (body.result === 'FAILED' && !(typeof body.remarks === 'string' && body.remarks.trim())) {
     throw new HttpError(400, 'Please write what needs re-cleaning when an inspection fails.');
   }
   v.maxLengths(body, { remarks: [255, 'Remarks'] });

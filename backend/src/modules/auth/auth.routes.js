@@ -118,6 +118,9 @@ router.post('/password', authenticate, async (req, res) => {
   if (!currentPassword || !newPassword) {
     throw new HttpError(400, 'Current and new password are required.');
   }
+  if (typeof currentPassword !== 'string' || currentPassword.length > 72) {
+    throw new HttpError(400, 'Your current password is incorrect.');
+  }
   if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD || newPassword.length > 72) {
     throw new HttpError(400, `The new password must be ${MIN_PASSWORD} to 72 characters long.`);
   }

@@ -80,6 +80,7 @@ router.patch('/:id', async (req, res) => {
   }
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
   v.maxLengths(body, { description: [255, 'Description'] });
+  v.notBlank(body, { description: 'Description' });
   const { rows } = await db.query(
     `UPDATE hk_maintenance_requests
         SET priority = COALESCE($1, priority),

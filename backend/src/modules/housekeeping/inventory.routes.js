@@ -115,6 +115,7 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
   }
   v.oneOf(body.category, CATEGORIES, 'category');
   v.maxLengths(body, ITEM_TEXT);
+  v.notBlank(body, { itemName: 'Item name', unit: 'Unit' });
   const reorderLevel = body.reorderLevel === undefined || body.reorderLevel === '' ? null : v.int(body.reorderLevel, 'Reorder level');
   const { rows } = await db.query(
     `UPDATE hk_inventory_items

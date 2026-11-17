@@ -166,6 +166,7 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
     endTime: req.body.endTime || current.end_time.slice(0, 5),
   };
   checkSchedule({ ...merged, assignedArea: req.body.assignedArea, notes: req.body.notes });
+  v.notBlank(req.body, { assignedArea: 'Assigned area' });
   // Moving a shift to another day must not move it into the past. Editing the
   // notes or area of a shift that already happened is still allowed.
   if (merged.shiftDate && merged.shiftDate !== current.shift_date_text) {

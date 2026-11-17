@@ -159,6 +159,12 @@ FROM (VALUES
 JOIN rooms r ON r.room_number = l.room_number
 JOIN users u ON u.username = l.username;
 
+-- Room 203 passed inspection, so Front Office has its "room ready" notice.
+INSERT INTO hk_front_office_notifications (room_id, message, created_by, created_at)
+SELECT r.room_id, 'Room 203 passed inspection and is ready to be released as AVAILABLE.', u.user_id, NOW() - INTERVAL '3 hours'
+FROM rooms r, users u
+WHERE r.room_number = '203' AND u.username = 'hk.inspector';
+
 -- Linen, amenity and cleaning-supply stock (Inventory page).
 INSERT INTO hk_inventory_items (item_name, category, unit, quantity, reorder_level, storage_area) VALUES
     ('Bath towel',          'LINEN',           'pcs',     120, 60, 'Linen room - Floor 1'),
