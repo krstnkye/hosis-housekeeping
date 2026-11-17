@@ -25,6 +25,8 @@ async function readStock(client, body, current = {}) {
   return { itemId, quantity };
 }
 
+const GUEST_ROOM_STATUSES = ['OCCUPIED', 'RESERVED'];
+
 const REQUEST_TYPES = ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER'];
 
 // Supervisors (and inspectors, who lead the floor) may assign any request.
@@ -88,8 +90,9 @@ router.post('/', async (req, res) => {
   if (!rooms[0]) {
     throw new HttpError(400, 'The selected room does not exist.');
   }
-  if (rooms[0].room_status === 'OUT_OF_ORDER') {
-    throw new HttpError(409, `Room ${rooms[0].room_number} is OUT OF ORDER, so no guest is staying in it.`);
+  // Only rooms Front Office has given to a guest (checked in or reserved).
+  if (!GUEST_ROOM_STATUSES.includes(rooms[0].room_status)) {
+    throw new HttpError(409, `Room ${rooms[0].room_number} is ${rooms[0].room_status.replace(/_/g, ' ')}, so no guest is staying in it. Guest requests are for OCCUPIED or RESERVED rooms.`);
   }
   const stock = await readStock(db, body);
   const { rows } = await db.query(

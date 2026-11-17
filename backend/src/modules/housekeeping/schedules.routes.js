@@ -38,8 +38,11 @@ function range(start, end) {
 
 // A staff member cannot be on two shifts at the same time. Shifts on the day
 // before are checked too, because a night shift can run into this day.
-async function assertNoOverlap({ staffId, shiftDate, startTime, endTime, ignoreId = null }) {
-  const { rows } = await db.query(
+async function assertNoOverlap(client, { staffId, shiftDate, startTime, endTime, ignoreId = null }) {
+  // One save at a time per staff member, so two supervisors saving at the
+  // same moment cannot both add overlapping shifts.
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`hk_schedule:${staffId}`]);
+  const { rows } = await client.query(
     `SELECT schedule_id, shift, TO_CHAR(shift_date, 'YYYY-MM-DD') AS shift_date,
             TO_CHAR(start_time, 'HH24:MI') AS start_time, TO_CHAR(end_time, 'HH24:MI') AS end_time,
             (shift_date - $2::date) AS day_offset
@@ -139,13 +142,16 @@ router.post('/', requirePosition('SUPERVISOR'), async (req, res) => {
   if (!staff[0]) {
     throw new HttpError(400, 'Schedules can only be created for active housekeeping staff.');
   }
-  await assertNoOverlap({ staffId, shiftDate: body.shiftDate, startTime: body.startTime, endTime: body.endTime });
-  const { rows } = await db.query(
-    `INSERT INTO hk_schedules (staff_id, shift_date, shift, start_time, end_time, assigned_area, notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [staffId, body.shiftDate, body.shift, body.startTime, body.endTime, body.assignedArea, body.notes || null]
-  );
-  res.status(201).json({ schedule: rows[0] });
+  const schedule = await db.withTransaction(async (client) => {
+    await assertNoOverlap(client, { staffId, shiftDate: body.shiftDate, startTime: body.startTime, endTime: body.endTime });
+    const { rows } = await client.query(
+      `INSERT INTO hk_schedules (staff_id, shift_date, shift, start_time, end_time, assigned_area, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [staffId, body.shiftDate, body.shift, body.startTime, body.endTime, body.assignedArea, body.notes || null]
+    );
+    return rows[0];
+  });
+  res.status(201).json({ schedule });
 });
 
 // HK-009: update a schedule entry.
@@ -172,23 +178,26 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
   if (merged.shiftDate && merged.shiftDate !== current.shift_date_text) {
     assertNotPast(merged.shiftDate);
   }
-  await assertNoOverlap({
-    staffId: current.staff_id,
-    shiftDate: merged.shiftDate || current.shift_date_text,
-    startTime: merged.startTime,
-    endTime: merged.endTime,
-    ignoreId: scheduleId,
+  const schedule = await db.withTransaction(async (client) => {
+    await assertNoOverlap(client, {
+      staffId: current.staff_id,
+      shiftDate: merged.shiftDate || current.shift_date_text,
+      startTime: merged.startTime,
+      endTime: merged.endTime,
+      ignoreId: scheduleId,
+    });
+    const { rows } = await client.query(
+      `UPDATE hk_schedules
+          SET shift_date = COALESCE($1, shift_date), shift = $2, start_time = $3, end_time = $4,
+              assigned_area = COALESCE($5, assigned_area), notes = $6
+        WHERE schedule_id = $7 RETURNING *`,
+      [merged.shiftDate || null, merged.shift, merged.startTime, merged.endTime,
+        req.body.assignedArea || null, req.body.notes !== undefined ? req.body.notes || null : current.notes,
+        scheduleId]
+    );
+    return rows[0];
   });
-  const { rows } = await db.query(
-    `UPDATE hk_schedules
-        SET shift_date = COALESCE($1, shift_date), shift = $2, start_time = $3, end_time = $4,
-            assigned_area = COALESCE($5, assigned_area), notes = $6
-      WHERE schedule_id = $7 RETURNING *`,
-    [merged.shiftDate || null, merged.shift, merged.startTime, merged.endTime,
-      req.body.assignedArea || null, req.body.notes !== undefined ? req.body.notes || null : current.notes,
-      scheduleId]
-  );
-  res.json({ schedule: rows[0] });
+  res.json({ schedule });
 });
 
 router.delete('/:id', requirePosition('SUPERVISOR'), async (req, res) => {

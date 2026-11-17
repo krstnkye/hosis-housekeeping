@@ -101,6 +101,20 @@ router.patch('/:id/status', async (req, res) => {
         WHERE room_id = $1 AND task_status = 'COMPLETED'`,
       [roomId]
     );
+    // A room marked DIRTY needs cleaning, so it gets a task for the
+    // supervisor to assign (unless one is already open).
+    const { rows: open } = await client.query(
+      `SELECT 1 FROM hk_cleaning_tasks
+        WHERE room_id = $1 AND task_status IN ('PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'RETURNED')`,
+      [roomId]
+    );
+    if (!open.length) {
+      const reason = req.body.remarks && String(req.body.remarks).trim();
+      await client.query(
+        `INSERT INTO hk_cleaning_tasks (room_id, task_type, priority, notes) VALUES ($1, 'TOUCH_UP', 'NORMAL', $2)`,
+        [roomId, (reason ? `Marked dirty: ${reason}` : 'Room marked dirty').slice(0, 255)]
+      );
+    }
     return updated;
   });
   res.json({ room });
