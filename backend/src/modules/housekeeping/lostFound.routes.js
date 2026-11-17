@@ -92,6 +92,7 @@ router.patch('/:id', async (req, res) => {
     throw new HttpError(400, 'Use Release (claim) or Dispose to change an item\'s status.');
   }
   v.maxLengths(body, ITEM_TEXT);
+  v.notBlank(body, { description: 'Description', storageLocation: 'Storage location' });
   const { rows } = await db.query(
     `UPDATE hk_lost_found_items
         SET item_description = COALESCE($1, item_description),
@@ -146,6 +147,9 @@ router.post('/:id/photos', async (req, res) => {
     );
     if (!items[0]) {
       throw new HttpError(404, 'Item not found.');
+    }
+    if (items[0].item_status !== 'STORED') {
+      throw new HttpError(409, `This item is already ${items[0].item_status.toLowerCase()}, so its photos cannot be changed.`);
     }
     const { rows: count } = await client.query(
       'SELECT COUNT(*)::int AS n FROM hk_lost_found_photos WHERE item_id = $1',

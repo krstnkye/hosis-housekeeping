@@ -25,6 +25,8 @@ async function readStock(client, body, current = {}) {
   return { itemId, quantity };
 }
 
+const GUEST_ROOM_STATUSES = ['OCCUPIED', 'RESERVED'];
+
 const REQUEST_TYPES = ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER'];
 
 // Supervisors (and inspectors, who lead the floor) may assign any request.
@@ -83,12 +85,21 @@ router.post('/', async (req, res) => {
   if (staffId) {
     await assertHousekeepingStaff(db, staffId, 'Guest requests can only be assigned to active housekeeping staff.');
   }
+  const roomId = v.id(body.roomId, 'room');
+  const { rows: rooms } = await db.query('SELECT room_number, room_status FROM rooms WHERE room_id = $1', [roomId]);
+  if (!rooms[0]) {
+    throw new HttpError(400, 'The selected room does not exist.');
+  }
+  // Only rooms Front Office has given to a guest (checked in or reserved).
+  if (!GUEST_ROOM_STATUSES.includes(rooms[0].room_status)) {
+    throw new HttpError(409, `Room ${rooms[0].room_number} is ${rooms[0].room_status.replace(/_/g, ' ')}, so no guest is staying in it. Guest requests are for OCCUPIED or RESERVED rooms.`);
+  }
   const stock = await readStock(db, body);
   const { rows } = await db.query(
     `INSERT INTO hk_guest_requests (guest_id, room_id, staff_id, request_type, priority, request_details, request_status,
                                     inv_item_id, quantity_requested)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-    [v.optionalId(body.guestId, 'guest'), v.id(body.roomId, 'room'), staffId, body.requestType,
+    [v.optionalId(body.guestId, 'guest'), roomId, staffId, body.requestType,
       body.priority || 'NORMAL', body.details, staffId ? 'IN_PROGRESS' : 'OPEN', stock.itemId, stock.quantity]
   );
   res.status(201).json({ request: rows[0] });
@@ -101,6 +112,7 @@ router.patch('/:id', async (req, res) => {
   v.oneOf(body.requestType, REQUEST_TYPES, 'requestType');
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
   v.maxLengths(body, { details: [255, 'Details'] });
+  v.notBlank(body, { details: 'Details' });
   const { rows: found } = await db.query('SELECT * FROM hk_guest_requests WHERE request_id = $1', [requestId]);
   const current = found[0];
   if (!current) {
@@ -202,9 +214,16 @@ router.post('/:id/approve-stock', async (req, res) => {
 router.post('/:id/complete', async (req, res) => {
   const requestId = v.id(req.params.id, 'request id');
   v.maxLengths(req.body || {}, { completionNotes: [255, 'Completion notes'] });
-  const { rows: found } = await db.query('SELECT staff_id FROM hk_guest_requests WHERE request_id = $1', [requestId]);
+  const { rows: found } = await db.query(
+    'SELECT staff_id, inv_item_id, stock_approved_at, request_status FROM hk_guest_requests WHERE request_id = $1',
+    [requestId]
+  );
   if (found[0] && found[0].staff_id && found[0].staff_id !== req.user.userId && !canManage(req.user)) {
     throw new HttpError(403, 'Only the assigned staff member or a supervisor can complete this request.');
+  }
+  // Stock handed to the guest must be taken out of inventory first.
+  if (found[0] && found[0].request_status !== 'COMPLETED' && found[0].inv_item_id && !found[0].stock_approved_at) {
+    throw new HttpError(409, 'Approve the requested stock first, so it is taken out of inventory, then complete the request.');
   }
   const { rows } = await db.query(
     `UPDATE hk_guest_requests

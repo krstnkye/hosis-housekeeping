@@ -47,11 +47,12 @@ router.post('/staff/:userId', async (req, res) => {
     const { rows } = await client.query(
       `UPDATE users SET password_hash = $1
         WHERE user_id = $2 AND role = 'HOUSEKEEPING' AND employment_status = 'ACTIVE'
+          AND (position <> 'SUPERVISOR' OR $3)
         RETURNING user_id, username, CONCAT(first_name, ' ', last_name) AS name`,
-      [hash, userId]
+      [hash, userId, req.user.role === 'ADMIN']
     );
     if (!rows[0]) {
-      throw new HttpError(404, 'Only active housekeeping staff can have their password reset here.');
+      throw new HttpError(404, 'Only active housekeepers and inspectors can have their password reset here. Another supervisor\'s password is reset by the system administrator.');
     }
     await client.query(
       `INSERT INTO hk_password_must_change (user_id, set_by) VALUES ($1, $2)

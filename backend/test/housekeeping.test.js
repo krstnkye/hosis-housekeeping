@@ -248,6 +248,8 @@ test('guest request: record, assign, complete', async () => {
 test('maintenance: report sets OUT OF ORDER, release creates cleaning task', async () => {
   const mark = await login('hk.mark');
   const room = await roomId('101');
+  // Start from a room with no open cleaning task.
+  await db.query(`DELETE FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`, [room]);
   const created = await api('POST', '/housekeeping/maintenance', {
     token: mark.token,
     body: { roomId: room, category: 'PLUMBING', description: 'Leaking faucet', priority: 'HIGH', setOutOfOrder: true },
@@ -744,9 +746,10 @@ test('guest request stock: approve takes the items out of inventory once', async
   const liza = await login('hk.liza');
   const items = (await api('GET', '/housekeeping/inventory', { token: joy.token })).body.items;
   const towel = items.find((i) => i.item_name === 'Bath towel');
+  await db.query(`UPDATE rooms SET room_status = 'OCCUPIED' WHERE room_number = '102'`);
   const created = await api('POST', '/housekeeping/guest-requests', {
     token: joy.token,
-    body: { roomId: await roomId('104'), requestType: 'TOWELS', details: 'Two bath towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 2 },
+    body: { roomId: await roomId('102'), requestType: 'TOWELS', details: 'Two bath towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 2 },
   });
   assert.equal(created.status, 201);
   const id = created.body.request.request_id;
@@ -767,7 +770,7 @@ test('guest request stock: approve takes the items out of inventory once', async
 
   const tooMany = await api('POST', '/housekeeping/guest-requests', {
     token: joy.token,
-    body: { roomId: await roomId('104'), requestType: 'TOWELS', details: 'Lots of towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 999 },
+    body: { roomId: await roomId('102'), requestType: 'TOWELS', details: 'Lots of towels', staffId: joy.user.userId, invItemId: towel.inv_item_id, quantity: 999 },
   });
   assert.equal((await api('POST', `/housekeeping/guest-requests/${tooMany.body.request.request_id}/approve-stock`, { token: joy.token })).status, 409);
   await api('POST', `/housekeeping/guest-requests/${tooMany.body.request.request_id}/complete`, { token: joy.token, body: {} });
@@ -856,4 +859,121 @@ test('api: dates are plain YYYY-MM-DD, blank text is refused, unknown rooms get 
   });
   assert.equal(missing.status, 400);
   assert.equal(missing.body.error, 'The selected room does not exist.');
+});
+
+test('checkout: a stayover waiting for inspection goes back to the housekeeper as a checkout clean', async () => {
+  const sup = await login('hk.supervisor');
+  const liza = await login('hk.liza');
+  const ins = await login('hk.inspector');
+  const fo = await loginAs('fo.desk');
+  const room = await roomId('202');
+  await db.query(`UPDATE rooms SET room_status = 'OCCUPIED' WHERE room_id = $1`, [room]);
+  await db.query(`DELETE FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`, [room]);
+  const created = await api('POST', '/housekeeping/tasks', {
+    token: sup.token, body: { roomId: room, taskType: 'STAYOVER', staffId: liza.user.userId },
+  });
+  const taskId = created.body.task.task_id;
+  await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: liza.token });
+  await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: liza.token });
+  const out = await api('POST', '/housekeeping/checkout', { token: fo.token, body: { roomId: room } });
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.equal(out.body.task.task_status, 'RETURNED');
+  assert.equal(out.body.task.task_type, 'CHECKOUT');
+  // The room can now be cleaned again and inspected.
+  assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: liza.token })).status, 200);
+  assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: liza.token })).status, 200);
+  const pass = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED' } });
+  assert.equal(pass.status, 201, JSON.stringify(pass.body));
+  assert.equal(await roomStatus(room), 'INSPECTED');
+});
+
+test('front office: a ready room marked DIRTY again no longer shows as ready', async () => {
+  const sup = await login('hk.supervisor');
+  const fo = await loginAs('fo.desk');
+  const room = await roomId('203');
+  await db.query(`DELETE FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`, [room]);
+  await db.query(`UPDATE rooms SET room_status = 'INSPECTED' WHERE room_id = $1`, [room]);
+  await db.query(`INSERT INTO hk_front_office_notifications (room_id, message) VALUES ($1, 'Room 203 passed inspection and is ready to be released as AVAILABLE.')`, [room]);
+  const before = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.token });
+  assert.ok(before.body.notifications.some((n) => n.room_id === room && n.notice_type === 'ROOM_READY'));
+  const dirty = await api('PATCH', `/housekeeping/rooms/${room}/status`, { token: sup.token, body: { status: 'DIRTY' } });
+  assert.equal(dirty.status, 200);
+  const after = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.token });
+  assert.ok(!after.body.notifications.some((n) => n.room_id === room && n.notice_type === 'ROOM_READY'));
+  const alerts = await api('GET', '/housekeeping/alerts', { token: sup.token });
+  assert.ok(!alerts.body.alerts.some((a) => a.type === 'ROOM_READY' && a.message.includes('203')));
+});
+
+test('guest requests: stock must be approved before completing, out-of-order rooms are refused', async () => {
+  const liza = await login('hk.liza');
+  const { rows } = await db.query(`SELECT inv_item_id FROM hk_inventory_items WHERE item_name = 'Bath towel'`);
+  await db.query(`UPDATE rooms SET room_status = 'OCCUPIED' WHERE room_number = '102'`);
+  const made = await api('POST', '/housekeeping/guest-requests', {
+    token: liza.token,
+    body: { roomId: await roomId('102'), requestType: 'TOWELS', details: 'Two towels', invItemId: rows[0].inv_item_id, quantity: 2, staffId: liza.user.userId },
+  });
+  assert.equal(made.status, 201);
+  const id = made.body.request.request_id;
+  const early = await api('POST', `/housekeeping/guest-requests/${id}/complete`, { token: liza.token, body: {} });
+  assert.equal(early.status, 409);
+  assert.equal((await api('POST', `/housekeeping/guest-requests/${id}/approve-stock`, { token: liza.token })).status, 200);
+  assert.equal((await api('POST', `/housekeeping/guest-requests/${id}/complete`, { token: liza.token, body: {} })).status, 200);
+  for (const number of ['302', '101', '103']) {
+    const vacant = await api('POST', '/housekeeping/guest-requests', {
+      token: liza.token, body: { roomId: await roomId(number), requestType: 'TOWELS', details: 'Towels' },
+    });
+    assert.equal(vacant.status, 409, `room ${number}`);
+  }
+});
+
+test('edits: text cannot be cleared to blank, and bad password input is a 400', async () => {
+  const sup = await login('hk.supervisor');
+  const item = await api('PATCH', '/housekeeping/inventory/1', { token: sup.token, body: { itemName: '   ' } });
+  assert.equal(item.status, 400);
+  const lf = await api('GET', '/housekeeping/lost-found', { token: sup.token });
+  const lfEdit = await api('PATCH', `/housekeeping/lost-found/${lf.body.items[0].item_id}`, { token: sup.token, body: { description: ' ' } });
+  assert.equal(lfEdit.status, 400);
+  const m = await api('GET', '/housekeeping/maintenance', { token: sup.token });
+  const mEdit = await api('PATCH', `/housekeeping/maintenance/${m.body.requests[0].request_id}`, { token: sup.token, body: { description: ' ' } });
+  assert.equal(mEdit.status, 400);
+  const pw = await api('POST', '/auth/password', { token: sup.token, body: { currentPassword: 123, newPassword: 'abcdefgh12' } });
+  assert.equal(pw.status, 400);
+});
+
+test('rooms: marking a room DIRTY by hand gives it a cleaning task', async () => {
+  const sup = await login('hk.supervisor');
+  const room = await roomId('101');
+  await db.query(`DELETE FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`, [room]);
+  await db.query(`UPDATE rooms SET room_status = 'AVAILABLE' WHERE room_id = $1`, [room]);
+  const res = await api('PATCH', `/housekeeping/rooms/${room}/status`, { token: sup.token, body: { status: 'DIRTY', remarks: 'Spilled coffee' } });
+  assert.equal(res.status, 200);
+  const { rows } = await db.query(`SELECT task_status, notes FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status = 'PENDING'`, [room]);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].notes, /Spilled coffee/);
+});
+
+test('staff accounts: a supervisor cannot reset another supervisor\'s password', async () => {
+  const sup = await login('hk.supervisor');
+  const { rows } = await db.query(
+    `INSERT INTO users (first_name, last_name, username, email, password_hash, role, position)
+     SELECT 'Second', 'Supervisor', 'hk.supervisor2', 'sup2@example.test', password_hash, 'HOUSEKEEPING', 'SUPERVISOR'
+       FROM users WHERE username = 'hk.supervisor'
+     ON CONFLICT (username) DO UPDATE SET position = 'SUPERVISOR' RETURNING user_id`
+  );
+  const res = await api('POST', `/housekeeping/password-resets/staff/${rows[0].user_id}`, { token: sup.token });
+  assert.equal(res.status, 404);
+  await db.query('DELETE FROM users WHERE user_id = $1', [rows[0].user_id]);
+});
+
+test('schedules: two overlapping shifts saved at the same moment cannot both be kept', async () => {
+  const sup = await login('hk.supervisor');
+  const { rows } = await db.query(`SELECT user_id FROM users WHERE username = 'hk.mark'`);
+  const day = new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10);
+  await db.query('DELETE FROM hk_schedules WHERE staff_id = $1 AND shift_date = $2', [rows[0].user_id, day]);
+  const base = { staffId: rows[0].user_id, shiftDate: day, assignedArea: 'Floor 1' };
+  const results = await Promise.all([
+    api('POST', '/housekeeping/schedules', { token: sup.token, body: { ...base, shift: 'MORNING', startTime: '06:00', endTime: '14:00' } }),
+    api('POST', '/housekeeping/schedules', { token: sup.token, body: { ...base, shift: 'AFTERNOON', startTime: '10:00', endTime: '18:00' } }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [201, 409]);
 });

@@ -76,6 +76,16 @@ async function changeRoomStatus(client, { roomId, newStatus, staffId, remarks, m
      VALUES ($1, $2, $3, $4, $5)`,
     [roomId, staffId, room.room_status, newStatus, remarks || null]
   );
+  // A room that leaves INSPECTED (marked DIRTY again, set OUT OF ORDER,
+  // released) is no longer ready, so its "room ready" notices are closed and
+  // Front Office does not act on an old one.
+  if (room.room_status === 'INSPECTED') {
+    await client.query(
+      `UPDATE hk_front_office_notifications SET read_at = NOW()
+        WHERE room_id = $1 AND notice_type = 'ROOM_READY' AND read_at IS NULL`,
+      [roomId]
+    );
+  }
   if (newStatus === 'INSPECTED') {
     await notifyFrontOffice(
       client,

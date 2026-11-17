@@ -294,7 +294,7 @@ function RequestForm({ request, rooms, staff: allStaff, guests, items, onSaved, 
         <Field label="Room">
           <select value={form.roomId} onChange={set('roomId')} disabled={!!request}>
             <option value="">Select room</option>
-            {rooms.map((r) => <option key={r.room_id} value={r.room_id}>{r.room_number} · {r.room_type}</option>)}
+            {rooms.filter((r) => request || ['OCCUPIED', 'RESERVED'].includes(r.room_status)).map((r) => <option key={r.room_id} value={r.room_id}>{r.room_number} · {r.room_type}</option>)}
           </select>
         </Field>
         <Field label="Guest">
