@@ -124,7 +124,15 @@ export default function LostFoundPage({ search: topSearch, user }) {
                   <dt>Date / time</dt><dd>{formatDateTime(selected.found_at)}</dd>
                   <dt>Storage</dt><dd>{selected.storage_location}</dd>
                 </dl>
-                {selected.photo_ids?.length > 0 && <PhotoStrip item={selected} />}
+                {selected.photo_ids?.length > 0 && (
+                  <section className="hk-item-photo" aria-label="Found item photos">
+                    <div className="hk-item-photo__heading">
+                      <strong>Item photo</strong>
+                      <span>Used to identify the belonging and support claim verification.</span>
+                    </div>
+                    <PhotoStrip item={selected} />
+                  </section>
+                )}
                 {selected.item_status === 'DISPOSED' && (
                   <Notice tone="amber" title={`Disposed by ${selected.disposed_by_name || 'a supervisor'}`}>
                     {formatDateTime(selected.disposed_at)} · {selected.disposal_reason}
@@ -326,7 +334,8 @@ function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
   return (
     <Card title={`Found item · ${item.storage_label}`} subtitle={`Recorded by ${item.found_by_name}`}>
       <div className="hk-badges"><Badge value={item.item_status} /></div>
-      <h3 className="hk-subhead">Photos</h3>
+      <h3 className="hk-subhead">Item photos</h3>
+      <p className="hk-muted">Photos help staff identify the belonging and verify a claimant.</p>
       {photos.length ? <PhotoStrip item={{ ...item, photo_ids: photos }} /> : <p className="hk-muted">No photos yet.</p>}
       {stored && photos.length < 3 && (
         <div className="hk-actions hk-actions--left">
@@ -477,24 +486,32 @@ function PhotoStrip({ item }) {
 
 function ItemPhoto({ path, alt }) {
   const [src, setSrc] = useState(null)
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let url = null
     let active = true
+    setSrc(null)
+    setFailed(false)
     fetchImage(path)
       .then((u) => {
         url = u
         if (active) setSrc(u)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) setFailed(true)
+      })
     return () => {
       active = false
       if (url) URL.revokeObjectURL(url)
     }
   }, [path])
+  if (failed) {
+    return <span className="hk-photos__item hk-photos__item--error" role="status">Photo unavailable</span>
+  }
   return src ? (
     <a href={src} target="_blank" rel="noreferrer" className="hk-photos__item"><img src={src} alt={alt} /></a>
   ) : (
-    <span className="hk-photos__item hk-photos__item--loading" aria-label="Loading photo" />
+    <span className="hk-photos__item hk-photos__item--loading" role="status">Loading photo…</span>
   )
 }
 

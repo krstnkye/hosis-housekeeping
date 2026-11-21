@@ -3053,6 +3053,26 @@ body.hk-no-scroll {
 }
 
 /* Lost & found photos */
+.hk-item-photo {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--hk-line);
+  border-radius: 10px;
+  background: #f8f7ff;
+}
+
+.hk-item-photo__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--hk-navy);
+}
+
+.hk-item-photo__heading span {
+  color: var(--hk-muted);
+  font-size: 0.82rem;
+}
+
 .hk-photos {
   display: flex;
   gap: 8px;
@@ -3075,6 +3095,23 @@ body.hk-no-scroll {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.hk-photos__item--loading,
+.hk-photos__item--error {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: var(--hk-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.hk-photos__item--error {
+  background: #fff6f6;
+  border-color: #d64545;
+  color: #8c1d1d;
 }
 
 .hk-photo-preview {
