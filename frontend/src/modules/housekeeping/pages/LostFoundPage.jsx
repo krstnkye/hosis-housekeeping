@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import { api, fetchImage } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
 import Modal from '../components/Modal.jsx'
@@ -513,17 +514,14 @@ function ItemLabel({ item }) {
   useEffect(() => {
     let active = true
     if (!payload) return () => { active = false }
-    import('qrcode')
-      .then(({ default: QRCode }) =>
-        QRCode.toDataURL(payload, {
-          errorCorrectionLevel: 'Q',
-          margin: 2,
-          width: 360,
-          color: { dark: '#08052f', light: '#ffffff' },
-        })
-      )
+    QRCode.toDataURL(payload, {
+      errorCorrectionLevel: 'Q',
+      margin: 2,
+      width: 360,
+      color: { dark: '#08052f', light: '#ffffff' },
+    })
       .then((data) => active && setQr(data))
-      .catch(() => active && setQrError('The QR code could not be generated. Please reopen this label.'))
+      .catch((error) => active && setQrError(error?.message || 'The QR code could not be generated.'))
     return () => {
       active = false
     }
