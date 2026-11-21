@@ -19,10 +19,11 @@ export function getSession() {
   const store = storage()
   const token = store.getItem(TOKEN_KEY)
   const user = store.getItem(USER_KEY)
-  return token && user ? { token, user: JSON.parse(user) } : null
+  try { return token && user ? { token, user: JSON.parse(user) } : null } catch { clearSession(); return null }
 }
 
 export function saveSession({ token, user }, remember) {
+  clearSession()
   const store = remember ? localStorage : sessionStorage
   store.setItem(TOKEN_KEY, token)
   store.setItem(USER_KEY, JSON.stringify(user))
@@ -56,9 +57,13 @@ export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn
 }
 
+function apiBase() {
+  return import.meta.env.VITE_API_BASE_URL || (externalSession ? '/api/v1' : '/api')
+}
+
 export async function request(method, path, body) {
   const session = getSession()
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -69,8 +74,8 @@ export async function request(method, path, body) {
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
   if (!res.ok) {
-    if (res.status === 401 && session) onUnauthorized()
-    throw new ApiError(res.status, data?.error || 'Request failed')
+    if (res.status === 401 && session && getSession()?.token === session.token) onUnauthorized()
+    throw new ApiError(res.status, data?.error?.message || data?.error || 'Request failed')
   }
   return data
 }
@@ -79,7 +84,7 @@ export async function request(method, path, body) {
 // blob: URL the page can show in an <img>.
 export async function fetchImage(path) {
   const session = getSession()
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     headers: session ? { Authorization: `Bearer ${session.token}` } : {},
   })
   if (!res.ok) throw new ApiError(res.status, 'Photo could not be loaded')
@@ -114,6 +119,9 @@ export const api = {
   alerts: () => request('GET', `${HK}/alerts`),
   activity: () => request('GET', `${HK}/activity`),
   audit: (q = '') => request('GET', `${HK}/audit${q}`),
+  staffAvailability: (date) => externalSession
+    ? request('GET', `${HK}/integrations/hr/availability?date=${encodeURIComponent(date)}`)
+    : Promise.resolve({ date, staff: [] }),
 
   rooms: (q = '') => request('GET', `${HK}/rooms${q}`),
   room: (id) => request('GET', `${HK}/rooms/${id}`),

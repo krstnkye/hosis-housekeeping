@@ -51,13 +51,22 @@ function StaffSchedules({ user, search }) {
   const [flash, setFlash] = useState(null)
   const schedules = useLoad(() => api.schedules(date), [date])
   const staff = useLoad(() => api.staff(), [], { refresh: false })
+  const availability = useLoad(() => api.staffAvailability(date), [date])
   const isSupervisor = user.position === 'SUPERVISOR' || user.role === 'ADMIN'
 
   const onDuty = schedules.data?.schedules || []
   const scheduled = new Set(onDuty.map((s) => s.staff_id))
+  const availabilityById = new Map((availability.data?.staff || []).map((member) => [Number(member.user_id), member]))
   const dayOff = (staff.data?.staff || [])
     .filter((s) => !scheduled.has(s.user_id))
-    .map((s) => ({ schedule_id: `off-${s.user_id}`, staff_id: s.user_id, staff_name: s.name, position: s.position, off: true }))
+    .map((s) => ({
+      schedule_id: `off-${s.user_id}`,
+      staff_id: s.user_id,
+      staff_name: s.name,
+      position: s.position,
+      off: true,
+      ...availabilityById.get(Number(s.user_id)),
+    }))
   const all = view === 'ASSIGNED' ? onDuty : view === 'DAY_OFF' ? dayOff : [...onDuty, ...dayOff]
   const rows = all.filter(
     (s) => !search || `${s.staff_name} ${s.assigned_area || ''}`.toLowerCase().includes(search.toLowerCase())
@@ -93,6 +102,7 @@ function StaffSchedules({ user, search }) {
             <Badge value="AVAILABLE">{onDuty.length} staff on duty</Badge>
           </DateNav>
           <LoadState loading={schedules.loading && !schedules.data} error={schedules.error} />
+          <LoadState error={availability.error} />
           <DataTable
             rowKey="schedule_id"
             rows={schedulePage.rows}
@@ -106,7 +116,7 @@ function StaffSchedules({ user, search }) {
             empty={view === 'DAY_OFF' ? 'Everyone is scheduled on this day.' : 'Nobody is scheduled on this day.'}
             columns={[
               { key: 'name', title: 'Housekeeper', render: (s) => <span><strong>{s.staff_name}</strong><small className="hk-block">{label(s.position)}</small></span> },
-              { key: 'shift', title: 'Shift', render: (s) => (s.off ? <Badge value="DAY_OFF">Day off</Badge> : <span>{label(s.shift)}<small className="hk-block">{formatTime(s.start_time)} - {formatTime(s.end_time)}</small></span>) },
+              { key: 'shift', title: 'Shift', render: (s) => (s.off ? <Badge value={s.on_approved_leave ? 'ON_LEAVE' : 'DAY_OFF'}>{s.on_approved_leave ? `Approved ${label(s.leave_type)} leave` : 'Day off'}</Badge> : <span>{label(s.shift)}<small className="hk-block">{formatTime(s.start_time)} - {formatTime(s.end_time)}</small></span>) },
               { key: 'tasks', title: 'Assigned', render: (s) => (s.off ? '-' : <span>{plural(s.assigned_tasks, 'room')}<small className="hk-block">{s.assigned_area}</small></span>) },
               { key: 'done', title: 'Complete', render: (s) => (s.off ? '-' : `${s.completed_tasks || 0} / ${s.assigned_tasks}`) },
             ]}
@@ -139,7 +149,10 @@ function StaffSchedules({ user, search }) {
           key={selected?.schedule_id || `new-${date}`}
           schedule={selected}
           date={date}
-          staff={staff.data.staff}
+          staff={staff.data.staff.map((member) => ({
+            ...member,
+            ...availabilityById.get(Number(member.user_id)),
+          }))}
           isSupervisor={isSupervisor}
           onNew={() => {
             setCreating(true)
@@ -230,7 +243,7 @@ function ScheduleForm({ schedule, date, staff, isSupervisor, onNew, onSaved }) {
         <Field label="Staff member" wide>
           <select value={form.staffId} onChange={set('staffId')} disabled={!!schedule || !isSupervisor}>
             <option value="">Select staff</option>
-            {staff.map((s) => <option key={s.user_id} value={s.user_id}>{s.name} ({label(s.position)})</option>)}
+            {staff.map((s) => <option key={s.user_id} value={s.user_id} disabled={s.on_approved_leave}>{s.name} ({label(s.position)}){s.on_approved_leave ? ' — on approved leave' : ''}</option>)}
           </select>
         </Field>
         <Field label="Schedule date">

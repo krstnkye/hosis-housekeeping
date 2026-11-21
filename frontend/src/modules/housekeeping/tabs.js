@@ -26,3 +26,17 @@ export const STAFF_TABS = [
   { id: 'record', name: 'Staff Reports', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6' },
   { id: 'account', name: 'Account', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
 ]
+
+export function isRegularHousekeeper(user) {
+  return user.role === 'HOUSEKEEPING' && user.position === 'HOUSEKEEPER'
+}
+
+export function housekeepingLandingHash(role) {
+  if (role === 'HOUSEKEEPING_VIEWER') return '#/housekeeping/rooms'
+  if (role === 'HOUSEKEEPING' || role === 'ADMIN') return '#/housekeeping/overview'
+  return ''
+}
+
+export function isHousekeepingHash(hash) {
+  return hash.startsWith('#/housekeeping/')
+}

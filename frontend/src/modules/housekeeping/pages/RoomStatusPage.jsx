@@ -9,7 +9,7 @@ import { usePagination } from '../usePagination.js'
 const OCCUPANCY = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', OUT_OF_ORDER: 'Blocked' }
 
 // HK-001 View Room Status, HK-002 Select Room, HK-003 Update Room Status.
-export default function RoomStatusPage({ search: topSearch }) {
+export default function RoomStatusPage({ search: topSearch = '', readOnly = false }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
   const [floor, setFloor] = useState('')
@@ -71,7 +71,7 @@ export default function RoomStatusPage({ search: topSearch }) {
           <p className="hk-footnote">Front Office releases INSPECTED rooms as AVAILABLE.</p>
         </Card>
         {activeId ? (
-          <RoomDetail key={activeId} roomId={activeId} onSaved={rooms.reload} />
+          <RoomDetail key={activeId} roomId={activeId} onSaved={rooms.reload} readOnly={readOnly} />
         ) : (
           <Card title="Room details"><p className="hk-muted">Select a room.</p></Card>
         )}
@@ -80,7 +80,7 @@ export default function RoomStatusPage({ search: topSearch }) {
   )
 }
 
-function RoomDetail({ roomId, onSaved }) {
+function RoomDetail({ roomId, onSaved, readOnly }) {
   const detail = useLoad(() => api.room(roomId), [roomId])
   const [status, setStatus] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -120,7 +120,8 @@ function RoomDetail({ roomId, onSaved }) {
         </p>
       )}
 
-      <div className="hk-form">
+      {!readOnly && <>
+        <div className="hk-form">
         <Field label="Update housekeeping status" wide>
           <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!allowedStatuses.length}>
             <option value="">{allowedStatuses.length ? 'Select new status' : 'No manual change allowed'}</option>
@@ -132,8 +133,8 @@ function RoomDetail({ roomId, onSaved }) {
         <Field label="Status note" wide>
           <input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Cleaning complete, inspection requested" />
         </Field>
-      </div>
-      <div className="hk-actions">
+        </div>
+        <div className="hk-actions">
         <button type="button" className="hk-btn hk-btn--primary" disabled={!status || busy} onClick={save}>
           Save status
         </button>
@@ -143,12 +144,14 @@ function RoomDetail({ roomId, onSaved }) {
         {room.room_status === 'OUT_OF_ORDER' && (
           <a className="hk-btn hk-btn--secondary" href="#/housekeeping/maintenance">View maintenance</a>
         )}
-      </div>
+        </div>
 
-      {message && <Notice tone={message.tone} title={message.title}>{message.text}</Notice>}
-      {room.room_status === 'INSPECTED' ? (
+        {message && <Notice tone={message.tone} title={message.title}>{message.text}</Notice>}
+      </>}
+      {room.room_status === 'INSPECTED' && (
         <Notice tone="green" title="Front Office notified">Room passed inspection and can be released as AVAILABLE.</Notice>
-      ) : (
+      )}
+      {['DIRTY', 'CLEAN'].includes(room.room_status) && (
         <Notice tone="amber" title="Front Office: not available yet">
           The room is released to Front Office after it passes inspection.
         </Notice>

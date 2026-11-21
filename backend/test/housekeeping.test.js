@@ -1,9 +1,9 @@
 // Integration tests for the Housekeeping API.
 // They need a PostgreSQL database with the shared tables and
 // database/schema/06-housekeeping.sql loaded. Before the tests run, they
-// reload database/seed/06-housekeeping-seed.sql, which RESETS all hk_ data,
-// so point DATABASE_URL at a development or test database only:
-//   DATABASE_URL=postgres://... npm test
+// reload database/seed/06-housekeeping-seed.sql, which RESETS all hk_ data.
+// The suite therefore derives or accepts a dedicated local
+// `hosis_housekeeping_test` database and refuses every other target.
 require('dotenv').config();
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-automated-tests';
 
@@ -11,6 +11,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+
+const configuredDatabase = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+if (!configuredDatabase) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required for integration tests.');
+const testUrl = new URL(configuredDatabase);
+if (!process.env.TEST_DATABASE_URL) testUrl.pathname = '/hosis_housekeeping_test';
+assert.equal(testUrl.pathname, '/hosis_housekeeping_test', 'Tests may only use the hosis_housekeeping_test database.');
+assert.ok(['127.0.0.1', 'localhost'].includes(testUrl.hostname), 'Tests may only use a local PostgreSQL server.');
+process.env.DATABASE_URL = testUrl.toString();
+
 const app = require('../src/app');
 const db = require('../src/config/db');
 const { assertConfig } = require('../src/config/env');
@@ -19,14 +28,18 @@ let server;
 let base;
 
 before(async () => {
+  const shared = fs.readFileSync(path.join(__dirname, '../../database/standalone/00-shared-tables.sql'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, '../../database/schema/06-housekeeping.sql'), 'utf8');
   const seed = fs.readFileSync(path.join(__dirname, '../../database/seed/06-housekeeping-seed.sql'), 'utf8');
+  await db.query(shared);
+  await db.query(schema);
   await db.query(seed);
   server = app.listen(0);
   base = `http://localhost:${server.address().port}/api`;
 });
 
 after(async () => {
-  server.close();
+  server?.close();
   await db.pool.end();
 });
 

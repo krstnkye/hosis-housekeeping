@@ -937,9 +937,9 @@
 }
 
 .hk-bell__panel {
-  position: absolute;
-  right: 0;
-  top: 48px;
+  position: fixed;
+  right: 16px;
+  top: 64px;
   width: min(380px, calc(100vw - 32px));
   max-height: min(420px, calc(100dvh - 80px));
   overflow-y: auto;

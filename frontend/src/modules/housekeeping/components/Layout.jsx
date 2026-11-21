@@ -83,7 +83,7 @@ export function Sidebar({ current, collapsed, onToggle, tabs = TABS, mobile = fa
 // Top bar from the Figma design: notification bell on the left, the signed-in
 // staff member and End session on the right.
 // On phones it also carries the menu button and the hotel mark.
-export function Topbar({ user, onLogout, onMenu, menuOpen = false }) {
+export function Topbar({ user, onLogout, onMenu, menuOpen = false, readOnly = false }) {
   const [confirm, setConfirm] = useState(false)
   return (
     <header className="hk-topbar">
@@ -103,19 +103,25 @@ export function Topbar({ user, onLogout, onMenu, menuOpen = false }) {
         </div>
       )}
       <div className="hk-topbar__actions">
-        <NotificationBell />
+        {!readOnly && <NotificationBell />}
         <div className="hk-user">
-          <ProfileAvatar user={user} className="hk-user__avatar" />
+          {readOnly ? (
+            <span className="hk-user__avatar" aria-hidden="true">
+              <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" size={18} />
+            </span>
+          ) : (
+            <ProfileAvatar user={user} className="hk-user__avatar" />
+          )}
           <span className="hk-user__text">
             <strong>{user.name}</strong>
-            <small>{user.position ? `Housekeeping ${label(user.position)} · Shared session active` : user.role}</small>
+            <small>{readOnly ? 'Front Office · Room status access' : user.role === 'ADMIN' ? 'Administrator' : `Housekeeping ${label(user.position)} · Shared session active`}</small>
           </span>
           <button type="button" className="hk-btn hk-btn--end" onClick={() => setConfirm(true)}>
             End session
           </button>
         </div>
       </div>
-      {confirm && <EndSession onCancel={() => setConfirm(false)} onConfirm={onLogout} />}
+      {confirm && <EndSession readOnly={readOnly} onCancel={() => setConfirm(false)} onConfirm={onLogout} />}
     </header>
   )
 }
@@ -183,11 +189,12 @@ export function PageHeader({ title, subtitle, actions }) {
 }
 
 // "End current session?" confirmation from the Figma design.
-function EndSession({ onCancel, onConfirm }) {
+function EndSession({ onCancel, onConfirm, readOnly }) {
   const [stats, setStats] = useState(null)
   useEffect(() => {
+    if (readOnly) return
     api.dashboard().then((d) => setStats(d.stats)).catch(() => {})
-  }, [])
+  }, [readOnly])
   const openWork = stats && stats.open_tasks + stats.awaiting_inspection + stats.open_requests > 0
 
   return (
@@ -204,7 +211,6 @@ function EndSession({ onCancel, onConfirm }) {
             Ending this session does not end your shift, complete or cancel tasks, or release rooms.
           </Notice>
         )}
-        <p className="hk-confirm__hint">Choose No to return to the Housekeeping Dashboard and continue working.</p>
         <div className="hk-actions">
           <button type="button" className="hk-btn hk-btn--secondary" onClick={onCancel}>
             No, continue working

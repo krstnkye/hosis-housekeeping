@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { clearSession, getSession, replaceSession, setExternalSession, setUnauthorizedHandler } from './api.js'
 import { PageHeader, Sidebar, Topbar } from './components/Layout.jsx'
-import { STAFF_TABS, TABS, TAB_POSITIONS } from './tabs.js'
+import { STAFF_TABS, TABS, TAB_POSITIONS, isRegularHousekeeper } from './tabs.js'
 import LoginPage from './pages/LoginPage.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
 import StaffDashboardPage from './pages/StaffDashboardPage.jsx'
@@ -75,12 +75,12 @@ function useIsMobile() {
   return mobile
 }
 
-const ALLOWED_ROLES = ['HOUSEKEEPING', 'ADMIN']
+const ALLOWED_ROLES = ['HOUSEKEEPING', 'ADMIN', 'HOUSEKEEPING_VIEWER']
 
 // Standalone: <HousekeepingApp /> shows its own login page.
 // Inside the combined HOSIS app: <HousekeepingApp session={{ token, user }} onLogout={...} />
 // uses the app shell's login instead. `user` must carry userId, name, role and position.
-export default function HousekeepingApp({ session: shellSession = null, onLogout: shellLogout = null }) {
+export default function HousekeepingApp({ session: shellSession = null, onLogout: shellLogout = null, onSessionChange: shellSessionChange = null }) {
   setExternalSession(shellSession)
   const [ownSession, setSession] = useState(() => (shellSession ? null : getSession()))
   const session = shellSession || ownSession
@@ -118,6 +118,7 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
       clearSession()
       setSession(null)
     })
+    return () => setUnauthorizedHandler(() => {})
   }, [shellLogout])
 
   if (!session) {
@@ -125,7 +126,7 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
   }
 
   function updateSession(next) {
-    if (shellSession) return
+    if (shellSession) { shellSessionChange?.(next); return }
     replaceSession(next)
     setSession(next)
   }
@@ -137,16 +138,6 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     }
     clearSession()
     setSession(null)
-  }
-
-  if (!ALLOWED_ROLES.includes(session.user.role)) {
-    return (
-      <div className="hk-app">
-        <main className="hk-content">
-          <PageHeader title="Access denied" subtitle="This account is not authorized for the Housekeeping module." actions={null} />
-        </main>
-      </div>
-    )
   }
 
   // A temporary password set by the supervisor must be replaced first.
@@ -168,10 +159,21 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
     )
   }
 
+  if (!ALLOWED_ROLES.includes(session.user.role)) {
+    return (
+      <div className="hk-app">
+        <main className="hk-content">
+          <PageHeader title="Access denied" subtitle="This account is not authorized for the Housekeeping module." actions={null} />
+        </main>
+      </div>
+    )
+  }
+
   // Housekeepers (regular staff) get the staff dashboard and staff menu.
-  const staff = session.user.position === 'HOUSEKEEPER'
-  const tabs = staff ? STAFF_MENU : leadMenu(session.user)
-  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'overview'
+  const staff = isRegularHousekeeper(session.user)
+  const readOnly = session.user.role === 'HOUSEKEEPING_VIEWER'
+  const tabs = readOnly ? LEAD_MENU.filter(({ id }) => ['rooms', 'account'].includes(id)) : staff ? STAFF_MENU : leadMenu(session.user)
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : readOnly ? 'rooms' : 'overview'
   const page = (staff && STAFF_PAGES[activeTab]) || PAGES[activeTab]
   const Page = page.component
 
@@ -198,13 +200,14 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
       <div className="hk-main">
         <Topbar
           user={session.user}
+          readOnly={readOnly}
           onMenu={mobile ? () => setMenuOpen(true) : null}
           menuOpen={mobile && menuOpen}
           onLogout={logout}
         />
         <main className="hk-content">
           <PageHeader title={page.title} subtitle={page.subtitle} actions={<span className="hk-actions" ref={setHeaderActions} />} />
-          <Page key={activeTab} user={session.user} search="" headerActions={headerActions} onSessionChange={updateSession} />
+          <Page key={activeTab} user={session.user} readOnly={readOnly} search="" headerActions={headerActions} onSessionChange={updateSession} />
         </main>
         <footer className="hk-footer">
           <span>Grand Horizon Hotel · Housekeeping operations</span>

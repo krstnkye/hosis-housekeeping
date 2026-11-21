@@ -7,10 +7,10 @@ export default function PublicLostFoundPage({ code }) {
 
   useEffect(() => {
     let active = true
-    fetch(`/api/public/lost-found/${encodeURIComponent(code)}`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/public/lost-found/${encodeURIComponent(code)}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Lost & Found item not found.')
+        if (!res.ok) throw new Error(data.error?.message || data.error || 'Lost & Found item not found.')
         return data
       })
       .then((data) => active && setState({ loading: false, item: data.item, error: null }))
