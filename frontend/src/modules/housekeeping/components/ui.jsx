@@ -114,8 +114,8 @@ function paginationItems(current, total) {
   return items
 }
 
-export function Pagination({ page, pageSize, total, onPageChange, itemLabel = 'records' }) {
-  if (total <= pageSize) return null
+export function Pagination({ page, pageSize, total, onPageChange, itemLabel = 'records', alwaysShow = false }) {
+  if (!alwaysShow && total <= pageSize) return null
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, pageCount)
   const first = total ? (currentPage - 1) * pageSize + 1 : 0

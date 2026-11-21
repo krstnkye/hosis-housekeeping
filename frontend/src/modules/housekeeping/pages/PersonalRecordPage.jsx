@@ -33,7 +33,6 @@ export default function PersonalRecordPage({ user }) {
     [selectedId]
   )
   const inspectionPage = usePagination(data?.inspections || [], 5, String(selectedId))
-  const activityPage = usePagination(data?.recent || [], 5, String(selectedId))
   if (!data) return <LoadState loading={loading} error={error} />
   const { profile: p, totals: t, inspections, recent } = data
 
@@ -135,13 +134,13 @@ export default function PersonalRecordPage({ user }) {
               { key: 'when', title: 'Date', render: (i) => <span>{formatDateTime(i.inspected_at)}{i.remarks && <small className="hk-block">{i.remarks}</small>}</span> },
             ]}
           />
-          <Pagination {...inspectionPage.pagination} itemLabel="inspection results" />
+          <Pagination {...inspectionPage.pagination} itemLabel="inspection results" alwaysShow />
         </Card>
 
         <Card title="Recent activity" subtitle={`${isOwnRecord ? 'Your' : `${p.first_name}'s`} latest work and reports`}>
           {recent.length ? (
             <ul className="hk-staff-list">
-              {activityPage.rows.map((a, i) => (
+              {recent.slice(0, 5).map((a, i) => (
                 <li key={`${a.type}-${i}`}>
                   <div>
                     <strong>{a.text}</strong>
@@ -153,7 +152,6 @@ export default function PersonalRecordPage({ user }) {
           ) : (
             <p className="hk-muted">No activity recorded yet.</p>
           )}
-          <Pagination {...activityPage.pagination} itemLabel="activity records" />
         </Card>
       </div>
     </div>
