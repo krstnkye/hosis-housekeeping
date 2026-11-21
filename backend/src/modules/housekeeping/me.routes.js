@@ -10,12 +10,10 @@ const router = express.Router();
 // Room conditions a staff member can report (Report Room Condition page).
 const CONDITIONS = ['DAMAGED', 'MISSING_ITEMS', 'STAINS_ODOR', 'SMOKING', 'PEST', 'SAFETY_HAZARD', 'EXCESSIVE_MESS', 'OTHER'];
 
-// GET /api/housekeeping/me/record: personal record for the signed-in user.
-router.get('/me/record', async (req, res) => {
-  const userId = req.user.userId;
+async function staffRecord(userId, includeEmail = false) {
   const [profile, totals, month, inspections, recent] = await Promise.all([
     db.query(
-      `SELECT user_id, username, email, first_name, last_name, role, position, employment_status, created_at
+      `SELECT user_id, username, ${includeEmail ? 'email,' : ''} first_name, last_name, role, position, employment_status, created_at
          FROM users WHERE user_id = $1`,
       [userId]
     ),
@@ -75,15 +73,32 @@ router.get('/me/record', async (req, res) => {
       [userId]
     ),
   ]);
-  if (!profile.rows[0]) {
-    throw new HttpError(404, 'Account not found.');
-  }
-  res.json({
+  if (!profile.rows[0]) return null;
+  return {
     profile: profile.rows[0],
     totals: { ...totals.rows[0], ...month.rows[0] },
     inspections: inspections.rows,
     recent: recent.rows,
-  });
+  };
+}
+
+// GET /api/housekeeping/me/record: personal record for the signed-in user.
+router.get('/me/record', async (req, res) => {
+  const record = await staffRecord(req.user.userId, true);
+  if (!record) throw new HttpError(404, 'Account not found.');
+  res.json(record);
+});
+
+// GET /api/housekeeping/staff-records/:userId: operational work report for any
+// Housekeeping coworker. Account secrets, guest details and claimant data are
+// deliberately excluded so staff can download transparent work records safely.
+router.get('/staff-records/:userId', async (req, res) => {
+  const userId = v.id(req.params.userId, 'staff member');
+  const record = await staffRecord(userId);
+  if (!record || record.profile.role !== 'HOUSEKEEPING') {
+    throw new HttpError(404, 'Housekeeping staff member not found.');
+  }
+  res.json(record);
 });
 
 // GET /api/housekeeping/me/reports: room condition reports this user sent to

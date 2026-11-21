@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox, StatusChips } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination, SearchBox, StatusChips } from '../components/ui.jsx'
 import { formatDateTime, label, ROOM_STATUSES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 // Occupancy column from the Figma design, derived from the room status.
 const OCCUPANCY = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', OUT_OF_ORDER: 'Blocked' }
@@ -23,7 +24,8 @@ export default function RoomStatusPage({ search: topSearch }) {
       (!query || `${r.room_number} ${r.room_type} ${r.housekeeper || ''}`.toLowerCase().includes(query))
   )
   const summary = rooms.data?.summary
-  const activeId = selectedId ?? list[0]?.room_id
+  const roomPage = usePagination(list, 10, `${filter}|${floor}|${query}`)
+  const activeId = roomPage.rows.some((room) => room.room_id === selectedId) ? selectedId : roomPage.rows[0]?.room_id
 
   function pick(value) {
     setFilter(value)
@@ -54,7 +56,7 @@ export default function RoomStatusPage({ search: topSearch }) {
           <LoadState loading={rooms.loading && !rooms.data} error={rooms.error} />
           <DataTable
             rowKey="room_id"
-            rows={list}
+            rows={roomPage.rows}
             selectedKey={activeId}
             onSelect={(r) => setSelectedId(r.room_id)}
             columns={[
@@ -65,6 +67,7 @@ export default function RoomStatusPage({ search: topSearch }) {
               { key: 'task', title: 'Cleaning task', render: (r) => (r.task_status ? label(r.task_status) : '-') },
             ]}
           />
+          <Pagination {...roomPage.pagination} itemLabel="rooms" />
           <p className="hk-footnote">Front Office releases INSPECTED rooms as AVAILABLE.</p>
         </Card>
         {activeId ? (
@@ -83,6 +86,7 @@ function RoomDetail({ roomId, onSaved }) {
   const [remarks, setRemarks] = useState('')
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(false)
+  const historyPage = usePagination(detail.data?.history || [], 5, String(roomId))
 
   if (!detail.data) return <Card title="Room details"><LoadState loading={detail.loading} error={detail.error} /></Card>
   const { room, history, currentTask, allowedStatuses } = detail.data
@@ -153,7 +157,7 @@ function RoomDetail({ roomId, onSaved }) {
       <h3 className="hk-subhead">Status history</h3>
       {history.length === 0 && <p className="hk-muted">No changes recorded yet.</p>}
       <ul className="hk-list">
-        {history.map((h) => (
+        {historyPage.rows.map((h) => (
           <li key={h.log_id}>
             <span>
               {label(h.previous_status)} → <strong>{label(h.new_status)}</strong>
@@ -163,6 +167,7 @@ function RoomDetail({ roomId, onSaved }) {
           </li>
         ))}
       </ul>
+      <Pagination {...historyPage.pagination} itemLabel="status changes" />
     </Card>
   )
 }

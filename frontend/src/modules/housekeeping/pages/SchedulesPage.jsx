@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import DatePicker, { DateNav } from '../components/DatePicker.jsx'
 import MySchedulePage from './MySchedulePage.jsx'
 import { formatTime, label, longDate, todayISO } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const SHIFT_TIMES = {
   MORNING: ['06:00', '14:00'],
@@ -61,7 +62,8 @@ function StaffSchedules({ user, search }) {
   const rows = all.filter(
     (s) => !search || `${s.staff_name} ${s.assigned_area || ''}`.toLowerCase().includes(search.toLowerCase())
   )
-  const selected = creating ? null : onDuty.find((s) => s.schedule_id === selectedId) || null
+  const schedulePage = usePagination(rows, 10, `${date}|${view}|${search || ''}`)
+  const selected = creating ? null : schedulePage.rows.find((s) => !s.off && s.schedule_id === selectedId) || null
   const assigned = onDuty.reduce((n, s) => n + s.assigned_tasks, 0)
   const completed = onDuty.reduce((n, s) => n + (s.completed_tasks || 0), 0)
 
@@ -93,7 +95,7 @@ function StaffSchedules({ user, search }) {
           <LoadState loading={schedules.loading && !schedules.data} error={schedules.error} />
           <DataTable
             rowKey="schedule_id"
-            rows={rows}
+            rows={schedulePage.rows}
             selectedKey={selected?.schedule_id}
             darkHover
             onSelect={(s) => {
@@ -109,6 +111,7 @@ function StaffSchedules({ user, search }) {
               { key: 'done', title: 'Complete', render: (s) => (s.off ? '-' : `${s.completed_tasks || 0} / ${s.assigned_tasks}`) },
             ]}
           />
+          <Pagination {...schedulePage.pagination} itemLabel="staff schedules" />
           {onDuty.length > 0 && (
             <Notice tone="violet" title={`${plural(assigned, 'cleaning task')} allocated · ${completed} complete · ${assigned - completed} remaining`}>
               {isSupervisor

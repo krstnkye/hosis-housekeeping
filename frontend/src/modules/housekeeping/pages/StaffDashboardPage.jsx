@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import Icon from '../components/Icon.jsx'
-import { Badge, Card, DataTable, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, DataTable, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label, todayISO } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const DONE = ['COMPLETED', 'INSPECTED']
 const TODO = ['PENDING', 'ASSIGNED', 'RETURNED']
@@ -39,6 +40,13 @@ export default function StaffDashboardPage({ user }) {
     () => Promise.all([api.tasks('?mine=1'), api.guestRequests(), api.mySchedule(), api.alerts()]),
     []
   )
+  const taskPage = usePagination(data?.[0]?.tasks || [], 5)
+  const requestPage = usePagination(
+    (data?.[1]?.requests || []).filter((request) => request.staff_id === user.userId),
+    5,
+    String(user.userId)
+  )
+  const alertPage = usePagination(data?.[3]?.alerts || [], 5)
   if (!data) return <LoadState loading={loading} error={error} />
   const [{ tasks }, { requests }, { schedules }, { alerts }] = data
 
@@ -56,7 +64,7 @@ export default function StaffDashboardPage({ user }) {
   const shift = schedules.find((s) => s.shift_date === today)
   const upcoming = schedules.find((s) => s.shift_date > today)
   // Same feed as the bell: tasks assigned or returned to this user, new guest requests, rooms released.
-  const myAlerts = alerts.slice(0, 6)
+  const myAlerts = alerts
 
   async function run(action, success) {
     setBusy(true)
@@ -112,7 +120,7 @@ export default function StaffDashboardPage({ user }) {
           >
             <DataTable
               rowKey="task_id"
-              rows={tasks}
+              rows={taskPage.rows}
               darkHover
               empty="No cleaning tasks assigned to you today."
               columns={[
@@ -123,6 +131,7 @@ export default function StaffDashboardPage({ user }) {
                 { key: 'status', title: 'Status', render: (t) => <Badge value={t.task_status} /> },
               ]}
             />
+            <Pagination {...taskPage.pagination} itemLabel="cleaning tasks" />
             <p className="hk-footnote">Completed rooms go to the inspector. Returned rooms need re-cleaning.</p>
           </Card>
 
@@ -133,7 +142,7 @@ export default function StaffDashboardPage({ user }) {
           >
             {myRequests.length ? (
               <ul className="hk-staff-list">
-                {myRequests.map((q) => (
+                {requestPage.rows.map((q) => (
                   <li key={q.request_id}>
                     <div>
                       <strong>Room {q.room_number} · {label(q.request_type)}</strong>
@@ -156,6 +165,7 @@ export default function StaffDashboardPage({ user }) {
             ) : (
               <p className="hk-muted">No guest requests are assigned to you.</p>
             )}
+            <Pagination {...requestPage.pagination} itemLabel="guest requests" />
             {unassigned.length > 0 && (
               <Notice tone="amber" title={`${plural(unassigned.length, 'request')} waiting for someone`}>
                 Open Guest Requests to pick one up and assign it to yourself.
@@ -186,7 +196,7 @@ export default function StaffDashboardPage({ user }) {
           <Card title="Notifications" subtitle="Assignments and requests that need you">
             {myAlerts.length ? (
               <ul className="hk-staff-alerts">
-                {myAlerts.map((a, i) => (
+                {alertPage.rows.map((a, i) => (
                   <li key={`${a.type}-${i}`}>
                     <a href={`#/housekeeping/${a.page}`}>
                       <span className={`hk-staff-alerts__icon hk-staff-alerts__icon--${a.type.toLowerCase()}`} aria-hidden="true">
@@ -203,6 +213,7 @@ export default function StaffDashboardPage({ user }) {
             ) : (
               <p className="hk-muted">You're all caught up.</p>
             )}
+            <Pagination {...alertPage.pagination} itemLabel="notifications" />
           </Card>
 
           <Card title="Quick actions">

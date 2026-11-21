@@ -40,8 +40,11 @@ router.patch('/notifications/:id/read', authorize('FRONT_OFFICE'), async (req, r
 // Front Office calls this when a guest checks out: the room becomes DIRTY and
 // Housekeeping receives a CHECKOUT cleaning task for the supervisor to assign.
 router.post('/checkout', authorize('FRONT_OFFICE'), async (req, res) => {
-  v.required(req.body, ['roomId']);
-  const roomId = v.id(req.body.roomId, 'room');
+  const body = req.body || {};
+  v.required(body, ['roomId']);
+  v.maxLengths(body, { notes: [255, 'Notes'], reservationReference: [100, 'Reservation reference'] });
+  const roomId = v.id(body.roomId, 'room');
+  const reservationReference = body.reservationReference ? String(body.reservationReference).trim() : null;
   const result = await db.withTransaction(async (client) => {
     const room = await lockRoom(client, roomId);
     if (room.room_status !== 'OCCUPIED') {
@@ -64,24 +67,89 @@ router.post('/checkout', authorize('FRONT_OFFICE'), async (req, res) => {
       // The guest has left, so the open task (often a stayover) becomes a full
       // checkout clean. One that was already cleaned and waiting for
       // inspection goes back to the housekeeper: the room is DIRTY again and
-      // could otherwise never pass or fail inspection.
+      // could otherwise never pass or fail inspection. Keep the Front Office
+      // reservation reference when one was supplied for cross-module tracing.
       const { rows: task } = await client.query(
         `UPDATE hk_cleaning_tasks
             SET task_type = 'CHECKOUT',
-                task_status = CASE WHEN task_status = 'COMPLETED' THEN 'RETURNED' ELSE task_status END
+                task_status = CASE WHEN task_status = 'COMPLETED' THEN 'RETURNED' ELSE task_status END,
+                reservation_reference = COALESCE(reservation_reference, $2)
           WHERE task_id = $1 RETURNING *`,
-        [open[0].task_id]
+        [open[0].task_id, reservationReference]
       );
       return { room: updated, task: task[0], created: false };
     }
     const { rows } = await client.query(
-      `INSERT INTO hk_cleaning_tasks (room_id, task_type, priority, notes)
-       VALUES ($1, 'CHECKOUT', 'NORMAL', $2) RETURNING *`,
-      [roomId, req.body.notes ? String(req.body.notes).slice(0, 255) : 'Guest checked out']
+      `INSERT INTO hk_cleaning_tasks (room_id, task_type, priority, notes, reservation_reference)
+       VALUES ($1, 'CHECKOUT', 'NORMAL', $2, $3) RETURNING *`,
+      [roomId, body.notes ? String(body.notes).trim() : 'Guest checked out', reservationReference]
     );
     return { room: updated, task: rows[0], created: true };
   });
   res.status(result.created ? 201 : 200).json(result);
+});
+
+// POST /api/housekeeping/front-office/guest-requests
+// Front Office records a housekeeping-type request from an existing booking.
+// reservationReference is deliberately stored as text instead of a foreign
+// key because the combined HOSIS reservation table is owned by Front Office.
+router.post('/front-office/guest-requests', authorize('FRONT_OFFICE'), async (req, res) => {
+  const body = req.body || {};
+  v.required(body, ['roomId', 'requestType', 'details']);
+  v.oneOf(body.requestType, ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER'], 'requestType');
+  v.oneOf(body.priority, v.PRIORITIES, 'priority');
+  v.maxLengths(body, { details: [255, 'Details'], reservationReference: [100, 'Reservation reference'] });
+  const roomId = v.id(body.roomId, 'room');
+  const guestId = v.optionalId(body.guestId, 'guest');
+  const reservationReference = body.reservationReference ? String(body.reservationReference).trim() : null;
+
+  const request = await db.withTransaction(async (client) => {
+    const { rows: rooms } = await client.query('SELECT room_id FROM rooms WHERE room_id = $1', [roomId]);
+    if (!rooms[0]) throw new HttpError(400, 'The selected room does not exist.');
+    if (guestId) {
+      const { rows: guests } = await client.query('SELECT guest_id FROM guests WHERE guest_id = $1', [guestId]);
+      if (!guests[0]) throw new HttpError(400, 'The selected guest does not exist.');
+    }
+    const { rows } = await client.query(
+      `INSERT INTO hk_guest_requests
+         (guest_id, room_id, request_type, priority, request_details, reservation_reference)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [guestId, roomId, body.requestType, body.priority || 'NORMAL', String(body.details).trim(), reservationReference]
+    );
+    return rows[0];
+  });
+  res.status(201).json({ request });
+});
+
+// GET /api/housekeeping/front-office/guest-requests[?reservationReference=...]
+// Lets Front Office show the current Housekeeping status on a booking without
+// granting access to the Housekeeping staff interface.
+router.get('/front-office/guest-requests', authorize('FRONT_OFFICE'), async (req, res) => {
+  v.oneOf(req.query.status, ['OPEN', 'IN_PROGRESS', 'COMPLETED'], 'status');
+  v.maxLengths(req.query, { reservationReference: [100, 'Reservation reference'] });
+  const params = [];
+  const where = [];
+  if (req.query.reservationReference) {
+    params.push(req.query.reservationReference);
+    where.push(`q.reservation_reference = $${params.length}`);
+  }
+  if (req.query.status) {
+    params.push(req.query.status);
+    where.push(`q.request_status = $${params.length}`);
+  }
+  const { rows } = await db.query(
+    `SELECT q.request_id, q.room_id, r.room_number, q.guest_id,
+            q.reservation_reference, q.request_type, q.priority,
+            q.request_details, q.request_status, q.requested_at, q.completed_at,
+            u.username AS assigned_staff_username
+       FROM hk_guest_requests q
+       JOIN rooms r ON r.room_id = q.room_id
+       LEFT JOIN users u ON u.user_id = q.staff_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY q.requested_at DESC LIMIT 100`,
+    params
+  );
+  res.json({ requests: rows });
 });
 
 // ---------------------------------------------------------------------

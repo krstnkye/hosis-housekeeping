@@ -7,6 +7,8 @@ const { authenticate, passwordVersion } = require('../../middleware/auth');
 const { checkLoginAllowed, recordLoginFailure, clearLoginFailures } = require('../../middleware/loginLimiter');
 
 const router = express.Router();
+const PROFILE_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 
 // POST /api/auth/login  { username, password, department? }
 // username may also be the staff member's email address.
@@ -98,14 +100,117 @@ router.get('/me', authenticate, (req, res) => {
 // GET /api/auth/account: the signed-in user's own account details.
 router.get('/account', authenticate, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT user_id, username, email, first_name, last_name, role, position, employment_status, created_at
-       FROM users WHERE user_id = $1`,
+    `SELECT u.user_id, u.username, u.email, u.first_name, u.last_name, u.role, u.position,
+            u.employment_status, u.created_at,
+            EXISTS (SELECT 1 FROM hk_staff_profile_photos p WHERE p.user_id = u.user_id) AS has_profile_photo
+       FROM users u WHERE u.user_id = $1`,
     [req.user.userId]
   );
   if (!rows[0]) {
     throw new HttpError(404, 'Account not found.');
   }
   res.json({ account: rows[0] });
+});
+
+// PATCH /api/auth/account  { firstName, lastName, email }
+// Staff may maintain their own contact profile. Login identity and employment
+// fields (username, department, position and status) remain administrator-owned.
+router.patch('/account', authenticate, async (req, res) => {
+  const { firstName, lastName, email } = req.body || {};
+  if (![firstName, lastName, email].every((value) => typeof value === 'string' && value.trim())) {
+    throw new HttpError(400, 'First name, last name and email are required.');
+  }
+
+  const profile = {
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
+    email: email.trim().toLowerCase(),
+  };
+  if (profile.firstName.length > 50 || profile.lastName.length > 50) {
+    throw new HttpError(400, 'First and last names must be 50 characters or fewer.');
+  }
+  if (profile.email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
+    throw new HttpError(400, 'Enter a valid email address.');
+  }
+
+  let account;
+  try {
+    const { rows } = await db.query(
+      `UPDATE users
+          SET first_name = $1, last_name = $2, email = $3
+        WHERE user_id = $4
+        RETURNING user_id, username, email, first_name, last_name, role, position,
+                  employment_status, created_at`,
+      [profile.firstName, profile.lastName, profile.email, req.user.userId]
+    );
+    account = rows[0];
+    const { rows: photos } = await db.query(
+      'SELECT EXISTS (SELECT 1 FROM hk_staff_profile_photos WHERE user_id = $1) AS present',
+      [req.user.userId]
+    );
+    account.has_profile_photo = photos[0].present;
+  } catch (err) {
+    if (err.code === '23505') {
+      throw new HttpError(409, 'That email address is already assigned to another account.');
+    }
+    throw err;
+  }
+  if (!account) {
+    throw new HttpError(404, 'Account not found.');
+  }
+
+  // Refresh the session claims so the header shows the new name immediately.
+  const { iat, exp, mustChangePassword, ...claims } = req.user;
+  const nextClaims = { ...claims, name: `${account.first_name} ${account.last_name}` };
+  const token = jwt.sign(nextClaims, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  });
+  const { pwv, ...publicUser } = nextClaims;
+  res.json({
+    account,
+    token,
+    user: { ...publicUser, mustChangePassword: Boolean(mustChangePassword) },
+  });
+});
+
+// GET/PUT/DELETE /api/auth/account/photo: each user manages their own image.
+router.get('/account/photo', authenticate, async (req, res) => {
+  const { rows } = await db.query(
+    'SELECT content_type, data FROM hk_staff_profile_photos WHERE user_id = $1',
+    [req.user.userId]
+  );
+  if (!rows[0]) {
+    throw new HttpError(404, 'Profile photo not found.');
+  }
+  res.set('Content-Type', rows[0].content_type);
+  res.set('Cache-Control', 'private, no-store');
+  res.send(rows[0].data);
+});
+
+router.put('/account/photo', authenticate, async (req, res) => {
+  const image = req.body && req.body.image;
+  const match = typeof image === 'string' && /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(image);
+  if (!match || !PROFILE_PHOTO_TYPES.includes(match[1])) {
+    throw new HttpError(400, 'Upload a JPEG, PNG or WebP profile photo.');
+  }
+  const data = Buffer.from(match[2], 'base64');
+  if (!data.length || data.length > MAX_PROFILE_PHOTO_BYTES) {
+    throw new HttpError(400, 'Profile photos must be 2 MB or smaller.');
+  }
+  const { rows } = await db.query(
+    `INSERT INTO hk_staff_profile_photos (user_id, content_type, data)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE
+       SET content_type = EXCLUDED.content_type, data = EXCLUDED.data, updated_at = NOW()
+     RETURNING content_type, updated_at`,
+    [req.user.userId, match[1], data]
+  );
+  res.json({ photo: rows[0] });
+});
+
+router.delete('/account/photo', authenticate, async (req, res) => {
+  await db.query('DELETE FROM hk_staff_profile_photos WHERE user_id = $1', [req.user.userId]);
+  res.status(204).end();
 });
 
 const MIN_PASSWORD = 8;

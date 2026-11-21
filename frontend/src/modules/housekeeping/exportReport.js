@@ -34,3 +34,25 @@ export async function exportExcel({ title, fileName, columns, rows }) {
   ]
   await writeXlsxFile(data, { columns: columns.map(() => ({ width: 22 })) }).toFile(`${fileName}.xlsx`)
 }
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+export async function exportCsv({ title, fileName, columns, rows }) {
+  const lines = [
+    [`Grand Horizon Hotel - ${title}`],
+    [`Generated ${stamp()}`],
+    [],
+    columns.map((c) => c.title),
+    ...rows.map((r) => columns.map((c) => c.value(r))),
+  ]
+  const csv = `\uFEFF${lines.map((line) => line.map(csvCell).join(',')).join('\r\n')}`
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${fileName}.csv`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}

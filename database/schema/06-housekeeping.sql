@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS hk_cleaning_tasks (
         CHECK (task_status IN ('PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED',
                                'INSPECTED', 'RETURNED')),
     notes           VARCHAR(255),
+    reservation_reference VARCHAR(100),
     assigned_date   DATE        NOT NULL DEFAULT CURRENT_DATE,
     due_time        TIME,
     start_time      TIMESTAMP,
@@ -87,6 +88,7 @@ CREATE TABLE IF NOT EXISTS hk_guest_requests (
     priority         VARCHAR(10)  NOT NULL DEFAULT 'NORMAL'
         CHECK (priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')),
     request_details  VARCHAR(255) NOT NULL,
+    reservation_reference VARCHAR(100),
     request_status   VARCHAR(20)  NOT NULL DEFAULT 'OPEN'
         CHECK (request_status IN ('OPEN', 'IN_PROGRESS', 'COMPLETED')),
     completion_notes VARCHAR(255),
@@ -166,10 +168,29 @@ ALTER TABLE hk_front_office_notifications
 -- Additions from the November 2026 audit
 -- ---------------------------------------------------------------------
 
+-- Optional Front Office booking references. These stay as text because the
+-- reservations table is owned by Front Office and may use a different key in
+-- the combined HOSIS database.
+ALTER TABLE hk_cleaning_tasks ADD COLUMN IF NOT EXISTS reservation_reference VARCHAR(100);
+ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS reservation_reference VARCHAR(100);
+
 -- Lost & found: who disposed of an item, when and why.
 ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposed_by     INT REFERENCES users(user_id);
 ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposed_at     TIMESTAMP;
 ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS disposal_reason VARCHAR(255);
+
+-- Permanent public lookup code used by the printed QR label. It is random,
+-- stable, and contains no account/session secret. Existing records receive a
+-- code once; generating or printing a label never changes it.
+ALTER TABLE hk_lost_found_items ADD COLUMN IF NOT EXISTS public_code VARCHAR(36);
+ALTER TABLE hk_lost_found_items ALTER COLUMN public_code
+    SET DEFAULT md5(random()::text || clock_timestamp()::text);
+UPDATE hk_lost_found_items
+   SET public_code = md5(random()::text || clock_timestamp()::text || item_id::text)
+ WHERE public_code IS NULL;
+ALTER TABLE hk_lost_found_items ALTER COLUMN public_code SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hk_lost_found_public_code
+    ON hk_lost_found_items (public_code);
 
 -- Item claims: which ID the claimant showed. Only the last 4 characters of
 -- the ID number are kept, so the record does not hold a full ID number.
@@ -184,6 +205,15 @@ CREATE TABLE IF NOT EXISTS hk_lost_found_photos (
     data         BYTEA        NOT NULL,
     uploaded_by  INT          NOT NULL REFERENCES users(user_id),
     uploaded_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- One profile photo per user. Kept in an hk_ table so this subsystem does not
+-- add columns to the class-wide users table owned by the shared HOSIS schema.
+CREATE TABLE IF NOT EXISTS hk_staff_profile_photos (
+    user_id      INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    content_type VARCHAR(30) NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    data         BYTEA       NOT NULL,
+    updated_at   TIMESTAMP   NOT NULL DEFAULT NOW()
 );
 
 -- Failed sign-ins, kept in the database so the lockout survives a restart.
@@ -253,3 +283,7 @@ CREATE INDEX IF NOT EXISTS idx_hk_tasks_staff    ON hk_cleaning_tasks (staff_id)
 CREATE INDEX IF NOT EXISTS idx_hk_logs_room      ON hk_room_status_logs (room_id);
 CREATE INDEX IF NOT EXISTS idx_hk_schedules_date ON hk_schedules (shift_date);
 CREATE INDEX IF NOT EXISTS idx_hk_requests_state ON hk_guest_requests (request_status);
+CREATE INDEX IF NOT EXISTS idx_hk_tasks_reservation ON hk_cleaning_tasks (reservation_reference)
+    WHERE reservation_reference IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_hk_requests_reservation ON hk_guest_requests (reservation_reference)
+    WHERE reservation_reference IS NOT NULL;

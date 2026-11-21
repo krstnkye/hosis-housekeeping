@@ -4,6 +4,28 @@ This subsystem uses the same programming languages, frameworks, and package
 versions as the class-wide HOSIS repository. It can be merged as a module
 without converting its source code.
 
+## Current integration status
+
+This checkout uses the integrated HOSIS layout: the Housekeeping frontend,
+backend routes, database schema, and tests live beside the shared application
+files. The main Express application mounts the router at `/api/housekeeping`,
+and the module uses the shared database pool, authentication middleware,
+users, rooms, and guests.
+
+| Integration | Status in this repository |
+| --- | --- |
+| Shared application shell | Supported through `<HousekeepingApp session={{ token, user }} onLogout={logout} />` |
+| Shared authentication | Compatible with the shared JWT when it contains `userId`, `role`, and `position` and uses the same `JWT_SECRET` |
+| Shared users, rooms, and guests | Implemented through foreign keys and read-only lookups; Housekeeping does not duplicate these master tables |
+| Front Office room turnover | Implemented: checkout, room-ready/condition notifications, booking-linked guest requests, reservation-reference tracking, and demo-only release/check-in stand-ins |
+| Engineering maintenance | Implemented: incoming request queue and protected `IN_PROGRESS`/`REPAIRED` updates |
+| HR/staff master data | Uses the shared `users` record; the combined project should keep HR/ADMIN as the owner of employment status and organization-wide roles |
+| Reservations/bookings | Linked by optional `reservationReference`; no foreign key is imposed because Front Office owns the reservation schema |
+| Reports and audit | Implemented: supervisors can review a read-only consolidated trail and export the filtered records to PDF or Excel |
+
+The deployment owner should still run the cross-module checks below whenever
+Housekeeping is merged with newer work from another subsystem.
+
 ## Shared technology stack
 
 | Layer | Language / technology | Class repository compatibility |
@@ -73,11 +95,22 @@ HOSIS tables that must exist before `06-housekeeping.sql` is loaded:
 | Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
 | Front Office | `GET /api/housekeeping/notifications?unread=1` | Notices from Housekeeping: `notice_type` ROOM_READY (room passed inspection) or ROOM_CONDITION (a staff member reported a room's condition: damage, missing items, smoking, ...) |
 | Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
+| Front Office | `POST /api/housekeeping/front-office/guest-requests` | Send a housekeeping-type request from an existing booking; accepts optional `guestId` and `reservationReference` |
+| Front Office | `GET /api/housekeeping/front-office/guest-requests?reservationReference=...` | Read the current Housekeeping status of requests linked to a booking |
 | Front Office (stand-in) | `GET /api/housekeeping/front-office/rooms` | Every room and its status (used by `npm run frontoffice`) |
 | Front Office (stand-in) | `POST /api/housekeeping/front-office/release` `{ roomId }` | INSPECTED → AVAILABLE and the room's ROOM_READY notices marked read |
 | Front Office (stand-in) | `POST /api/housekeeping/front-office/check-in` `{ roomId }` | AVAILABLE or RESERVED → OCCUPIED |
 | Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
 | Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` |
+
+## Public Lost & Found QR lookup
+
+`GET /api/public/lost-found/:publicCode` is the permanent destination printed
+inside each item's QR label. A random code is assigned once when the record is
+created; printing or downloading the label does not regenerate it. The route
+does not require a login and returns only the reference, item description,
+found location/date, and current status. It never returns guest, claimant,
+staff, internal storage, claim-history, or credential data.
 
 The three stand-in endpoints only let the standalone demo finish the room
 cycle. Once the Front Office module handles check-in and room release itself,
@@ -87,6 +120,13 @@ Front Office should read `notice_type` on each notice: `ROOM_READY` means the
 room can be released as AVAILABLE; `ROOM_CONDITION` is a staff member's report
 (damage, missing items, smoking, pests, safety hazard, excessive mess) that
 Front Office may need to charge or follow up with the guest.
+
+When Front Office calls `POST /checkout`, it may include
+`reservationReference`. Housekeeping copies that reference to the generated
+checkout cleaning task. The reference is intentionally not a foreign key:
+Front Office owns the reservations table, while Housekeeping only preserves
+the identifier needed for cross-module traceability. The same rule applies to
+guest requests created through the Front Office integration endpoint.
 
 ## Decisions to confirm with the project manager
 
@@ -106,7 +146,7 @@ decides otherwise.
 | Forgot password | Not settled (Users and Roles gives ADMIN user management) | Housekeeping supervisors set temporary passwords for active HOUSEKEEPING accounts only (`hk_password_resets`, `hk_password_must_change`); ADMIN keeps full user management |
 | Login lockout | NFR-SEC-001 | Failed sign-ins in `hk_login_failures` (5 failures per account and address in 15 minutes). A shared login can replace it |
 
-## Merge checklist for the project manager
+## Integration verification checklist
 
 1. Copy the Housekeeping-owned paths listed above into the class repository.
 2. Keep the class repository's root React application and render
@@ -133,7 +173,8 @@ decides otherwise.
 8. Run `npm run lint` and `npm run build` in `frontend/`, and `npm test` in
    `backend/` against a test database.
 9. Test with Front Office (checkout, room-ready and room-condition notices,
-   room release) and Engineering (incoming requests and REPAIRED) together.
+   booking-linked guest requests, room release) and Engineering (incoming
+   requests and REPAIRED) together.
 
 ## Environment variables
 

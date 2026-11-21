@@ -25,6 +25,7 @@ SET TIME ZONE 'Asia/Manila';
 
 TRUNCATE hk_inventory_movements, hk_inventory_items, hk_password_must_change,
          hk_password_resets, hk_login_failures, hk_lost_found_photos,
+         hk_staff_profile_photos,
          hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
          hk_lost_found_items, hk_guest_requests, hk_schedules, hk_inspections,
          hk_cleaning_tasks, hk_room_status_logs
@@ -131,13 +132,13 @@ JOIN (SELECT DISTINCT ON (first_name) guest_id, first_name FROM guests ORDER BY 
 JOIN rooms r ON r.room_number = q.room_number
 LEFT JOIN users u ON u.username = q.username;
 
-INSERT INTO hk_lost_found_items (room_id, found_by, item_description, found_location, storage_label, storage_location, found_at)
-SELECT r.room_id, u.user_id, i.description, i.location, i.label, i.storage, NOW() - i.age::interval
+INSERT INTO hk_lost_found_items (room_id, found_by, item_description, found_location, storage_label, storage_location, found_at, public_code)
+SELECT r.room_id, u.user_id, i.description, i.location, i.label, i.storage, NOW() - i.age::interval, i.public_code
 FROM (VALUES
-    ('201', 'hk.liza', 'Black leather wallet with ID cards', 'Under the bed',      'LF-0001', 'Cabinet A - Shelf 1', '2 hours'),
-    ('104', 'hk.mark', 'Silver wristwatch',                  'Bathroom counter',   'LF-0002', 'Safe box 1',          '1 day'),
-    ('103', 'hk.joy',  'Blue umbrella',                      'Closet',             'LF-0003', 'Cabinet B - Shelf 2', '3 days')
-) AS i(room_number, username, description, location, label, storage, age)
+    ('201', 'hk.liza', 'Black leather wallet with ID cards', 'Under the bed',      'LF-0001', 'Cabinet A - Shelf 1', '2 hours', '11111111111111111111111111111111'),
+    ('104', 'hk.mark', 'Silver wristwatch',                  'Bathroom counter',   'LF-0002', 'Safe box 1',          '1 day',   '22222222222222222222222222222222'),
+    ('103', 'hk.joy',  'Blue umbrella',                      'Closet',             'LF-0003', 'Cabinet B - Shelf 2', '3 days',  '33333333333333333333333333333333')
+) AS i(room_number, username, description, location, label, storage, age, public_code)
 JOIN rooms r ON r.room_number = i.room_number
 JOIN users u ON u.username = i.username
 ON CONFLICT (storage_label) DO NOTHING;

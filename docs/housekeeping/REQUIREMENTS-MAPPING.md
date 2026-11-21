@@ -25,6 +25,8 @@ HK-002 is "Select Room"). This table links them, so both can be traced.
 | ENG-001, section 9.4 | Report problems to Engineering | HK-015 Create Maintenance Request | Maintenance page, `POST /maintenance` |
 | ENG-002, ENG-003 | Engineering views and updates maintenance requests | (Engineering side of HK-015) | `GET /maintenance/incoming`, `PATCH /maintenance/:id/status` |
 | Section 9.1 | Checkout makes the room DIRTY and Housekeeping receives a task | (Front Office side) | `POST /checkout` |
+| FO-014 | Front Office records and follows a housekeeping-type guest request | HK-013 Record Request | `POST /front-office/guest-requests`, `GET /front-office/guest-requests?reservationReference=...` |
 | (beyond the class list) | Stock for a guest request (Figma Guest Request screen) | (added after the flowchart) | Guest Requests Inventory stock card, `/guest-requests/:id/approve-stock` |
 | NFR-SEC-001, Users and Roles | Sign-in lockout, password change and reset | Log In, Authorized? | Login, Account and Staff Accounts pages, `/api/auth/login`, `/api/auth/password`, `/api/auth/forgot-password`, `/password-resets` |
-| HK-010 | Update and track lost and found records (photos, labels, disposal) | HK-010 Store and Label Item, HK-011 Search or View Records | Lost & Found page, `/lost-found/:id/photos`, `/lost-found/:id/dispose` |
+| HK-010 | Update and track lost and found records (photos, permanent item-specific QR labels, disposal) | HK-010 Store and Label Item, HK-011 Search or View Records | Lost & Found page, `/lost-found/:id/photos`, `/lost-found/:id/dispose`; each QR opens only its item's privacy-safe public HOSIS page through `/api/public/lost-found/:publicCode` |
+| Defense review: reports/audit trails | Supervisor traceability and formal exports | (supporting control) | Reports & Audit Trail page, `GET /audit`, PDF and Excel export |

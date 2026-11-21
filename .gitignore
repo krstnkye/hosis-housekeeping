@@ -4,3 +4,8 @@ node_modules/
 dist/
 build/
 *.log
+
+# Local Codex/document rendering artifacts (not application source)
+.codex-finalizer/
+output/
+tmp/

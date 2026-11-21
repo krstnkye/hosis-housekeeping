@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { api } from '../api.js'
 import Modal from '../components/Modal.jsx'
 import { exportPdf } from '../exportReport.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { formatDateTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const CATEGORIES = ['PLUMBING', 'ELECTRICAL', 'AIRCON', 'FURNITURE', 'APPLIANCE', 'OTHER']
 const RELEASE_CHECKS = [
@@ -36,7 +37,8 @@ export default function MaintenancePage() {
 
   const all = issues.data?.requests || []
   const list = all.filter((r) => (status ? r.status === status : r.status !== 'CLOSED'))
-  const selected = list.find((r) => r.request_id === selectedId) || list[0]
+  const issuePage = usePagination(list, 10, status)
+  const selected = issuePage.rows.find((r) => r.request_id === selectedId) || issuePage.rows[0]
 
   function refresh(msg, id) {
     setFlash(msg)
@@ -61,7 +63,7 @@ export default function MaintenancePage() {
             <LoadState loading={issues.loading && !issues.data} error={issues.error} />
             <DataTable
               rowKey="request_id"
-              rows={list}
+              rows={issuePage.rows}
               selectedKey={selected?.request_id}
               onSelect={(r) => setSelectedId(r.request_id)}
               darkHover
@@ -72,6 +74,7 @@ export default function MaintenancePage() {
                 { key: 'status', title: 'Repair status', render: (r) => <Badge value={r.status} /> },
               ]}
             />
+            <Pagination {...issuePage.pagination} itemLabel="maintenance issues" />
           </Card>
         </div>
         <div className="hk-stack">
@@ -97,6 +100,7 @@ function ReportForm({ rooms, issues, onSaved }) {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(false)
+  const previewPage = usePagination(issues, 10)
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
   const report = { title: 'Maintenance Report', fileName: 'maintenance-report', columns: REPORT_COLUMNS, rows: issues }
   const room = rooms.find((r) => String(r.room_id) === String(form.roomId))
@@ -177,10 +181,11 @@ function ReportForm({ rooms, issues, onSaved }) {
         <Modal title="Maintenance report preview" onClose={() => setPreview(false)}>
           <DataTable
             rowKey="request_id"
-            rows={issues}
+            rows={previewPage.rows}
             empty="No issues in this view."
             columns={REPORT_COLUMNS.map((c) => ({ key: c.title, title: c.title, render: c.value }))}
           />
+          <Pagination {...previewPage.pagination} itemLabel="maintenance issues" />
           <div className="hk-actions">
             <button type="button" className="hk-btn hk-btn--primary" onClick={() => exportPdf(report)} disabled={!issues.length}>Download PDF</button>
           </div>

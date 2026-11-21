@@ -91,10 +91,15 @@ const HK = '/housekeeping'
 export const api = {
   login: (body) => request('POST', '/auth/login', body),
   account: () => request('GET', '/auth/account'),
+  updateProfile: (body) => request('PATCH', '/auth/account', body),
+  updateProfilePhoto: (image) => request('PUT', '/auth/account/photo', { image }),
+  deleteProfilePhoto: () => request('DELETE', '/auth/account/photo'),
+  profilePhotoPath: () => '/auth/account/photo',
   changePassword: (body) => request('POST', '/auth/password', body),
   forgotPassword: (body) => request('POST', '/auth/forgot-password', body),
 
   passwordResets: () => request('GET', `${HK}/password-resets`),
+  createStaffAccount: (body) => request('POST', `${HK}/password-resets/staff`, body),
   resetStaffPassword: (userId) => request('POST', `${HK}/password-resets/staff/${userId}`),
   dismissReset: (id) => request('POST', `${HK}/password-resets/${id}/dismiss`),
 
@@ -108,6 +113,7 @@ export const api = {
   notifications: () => request('GET', `${HK}/notifications`),
   alerts: () => request('GET', `${HK}/alerts`),
   activity: () => request('GET', `${HK}/activity`),
+  audit: (q = '') => request('GET', `${HK}/audit${q}`),
 
   rooms: (q = '') => request('GET', `${HK}/rooms${q}`),
   room: (id) => request('GET', `${HK}/rooms/${id}`),
@@ -151,6 +157,7 @@ export const api = {
   releaseRoom: (id) => request('POST', `${HK}/maintenance/${id}/release`),
 
   myRecord: () => request('GET', `${HK}/me/record`),
+  staffRecord: (userId) => request('GET', `${HK}/staff-records/${userId}`),
   myReports: () => request('GET', `${HK}/me/reports`),
   reportCondition: (body) => request('POST', `${HK}/room-reports`, body),
 }

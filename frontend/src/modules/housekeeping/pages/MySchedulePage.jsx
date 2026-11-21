@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, DataTable, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, DataTable, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { DateNav } from '../components/DatePicker.jsx'
 import { formatTime, label, longDate, todayISO } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const DONE = ['COMPLETED', 'INSPECTED']
 
@@ -13,8 +14,8 @@ export default function MySchedulePage({ user }) {
   const today = todayISO()
   const [date, setDate] = useState(today)
   const mine = useLoad(() => Promise.all([api.mySchedule(), api.tasks('?mine=1')]), [])
-  if (!mine.data) return <LoadState loading={mine.loading} error={mine.error} />
-  const [{ schedules }, { tasks }] = mine.data
+  const schedules = mine.data?.[0]?.schedules || []
+  const tasks = mine.data?.[1]?.tasks || []
 
   const shift = schedules.find((s) => s.shift_date === date)
   const isToday = date === today
@@ -23,8 +24,11 @@ export default function MySchedulePage({ user }) {
   const assigned = isToday ? dayTasks.length : shift?.assigned_tasks || 0
   const completed = isToday ? dayTasks.filter((t) => DONE.includes(t.task_status)).length : shift?.completed_tasks || 0
   const remaining = dayTasks.filter((t) => !DONE.includes(t.task_status))
+  const roomPage = usePagination(remaining, 5, date)
   const pct = assigned ? Math.round((completed / assigned) * 100) : 0
   const upcoming = schedules.filter((s) => s.shift_date > date).slice(0, 3)
+
+  if (!mine.data) return <LoadState loading={mine.loading} error={mine.error} />
 
   return (
     <div className="hk-grid">
@@ -55,7 +59,7 @@ export default function MySchedulePage({ user }) {
         <Card title="My remaining rooms" subtitle={isToday ? 'Highest priority first' : 'Room list is shown for today only'}>
           <DataTable
             rowKey="task_id"
-            rows={remaining}
+            rows={roomPage.rows}
             darkHover
             empty={isToday ? 'All your rooms are done.' : 'Pick today to see your room list.'}
             columns={[
@@ -65,6 +69,7 @@ export default function MySchedulePage({ user }) {
               { key: 'status', title: 'Status', render: (t) => <Badge value={t.task_status}>{label(t.task_status)}</Badge> },
             ]}
           />
+          <Pagination {...roomPage.pagination} itemLabel="remaining rooms" />
           {assigned > 0 && (
             <Notice tone={completed === assigned ? 'green' : 'violet'} title={`${completed} of ${assigned} cleaning tasks completed`}>
               {completed === assigned ? 'Your rooms are waiting for inspection.' : 'Start the next room from the Cleaning Tasks page.'}

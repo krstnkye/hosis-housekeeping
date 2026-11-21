@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { exportExcel, exportPdf } from '../exportReport.js'
+import { exportCsv, exportExcel, exportPdf } from '../exportReport.js'
 
 // "Export" dropdown with PDF and Excel options.
 // columns: [{ title, value: (row) => text }]
@@ -33,6 +33,7 @@ export default function ExportMenu({ title, fileName, columns, rows, label = 'Ex
         <div className="hk-export__menu" role="menu">
           <button type="button" role="menuitem" onClick={() => run(exportPdf)}>PDF report</button>
           <button type="button" role="menuitem" onClick={() => run(exportExcel)}>Excel (.xlsx)</button>
+          <button type="button" role="menuitem" onClick={() => run(exportCsv)}>CSV (.csv)</button>
         </div>
       )}
       {error && <span className="hk-export__error" role="alert">{error}</span>}

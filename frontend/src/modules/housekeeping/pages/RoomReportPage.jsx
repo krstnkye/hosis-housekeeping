@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, Field, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, Field, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { formatDateTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 // Room conditions staff can report (same list as the API).
 const CONDITIONS = ['DAMAGED', 'MISSING_ITEMS', 'STAINS_ODOR', 'SMOKING', 'PEST', 'SAFETY_HAZARD', 'EXCESSIVE_MESS', 'OTHER']
@@ -39,6 +40,7 @@ export default function RoomReportPage() {
   const [form, setForm] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
+  const reportPage = usePagination(reports.data?.reports || [], 5)
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
 
   if (!rooms.data) return <LoadState loading={rooms.loading} error={rooms.error} />
@@ -172,7 +174,7 @@ export default function RoomReportPage() {
           <LoadState loading={reports.loading && !reports.data} error={reports.error} />
           {reports.data && (reports.data.reports.length ? (
             <ul className="hk-staff-list">
-              {reports.data.reports.map((r) => (
+              {reportPage.rows.map((r) => (
                 <li key={`${r.sent_to}-${r.id}`}>
                   <div>
                     <strong>Room {r.room_number} · {r.sent_to === 'FRONT_OFFICE' ? 'Front Office' : 'Maintenance'}</strong>
@@ -188,6 +190,7 @@ export default function RoomReportPage() {
           ) : (
             <p className="hk-muted">You haven't sent any reports yet.</p>
           ))}
+          <Pagination {...reportPage.pagination} itemLabel="room reports" />
         </Card>
         <Notice tone="violet" title="When to report">
           Report damage, missing items or anything unsafe as soon as you find it, before you finish cleaning the room.

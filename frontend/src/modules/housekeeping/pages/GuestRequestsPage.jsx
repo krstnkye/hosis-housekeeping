@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom'
 import { api } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
 import Modal from '../components/Modal.jsx'
-import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination, SearchBox } from '../components/ui.jsx'
 import { formatDateTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const REQUEST_TYPES = ['TOWELS', 'AMENITIES', 'EXTRA_BED', 'CLEANING', 'LAUNDRY', 'OTHER']
 
@@ -41,10 +42,12 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
   )
   const all = requests.data?.requests || []
   const opened = all.find((r) => r.request_id === openId)
-  const selected = list.find((r) => r.request_id === selectedId) || list[0]
   const openCount = all.filter((r) => r.request_status !== 'COMPLETED').length
   const today = new Date().toDateString()
   const doneToday = all.filter((r) => r.request_status === 'COMPLETED' && r.completed_at && new Date(r.completed_at).toDateString() === today)
+  const requestPage = usePagination(list, 10, `${status}|${priority}|${query}`)
+  const completedPage = usePagination(doneToday, 5)
+  const selected = requestPage.rows.find((r) => r.request_id === selectedId) || requestPage.rows[0]
 
   function refresh(msg) {
     setFlash(msg)
@@ -65,7 +68,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
   const actions = (
     <>
       <button type="button" className="hk-btn hk-btn--primary" onClick={() => setCreating(true)} disabled={!lookups.data}>+ Record request</button>
-      <ExportMenu title="Guest Requests" fileName="guest-requests" columns={REPORT_COLUMNS} rows={list} label="Export · PDF / Excel" />
+      <ExportMenu title="Guest Requests" fileName="guest-requests" columns={REPORT_COLUMNS} rows={list} label="Export · PDF / Excel / CSV" />
     </>
   )
 
@@ -98,7 +101,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
           <LoadState loading={requests.loading && !requests.data} error={requests.error} />
           <DataTable
             rowKey="request_id"
-            rows={list}
+            rows={requestPage.rows}
             selectedKey={selected?.request_id}
             onSelect={(r) => setSelectedId(r.request_id)}
             darkHover
@@ -110,6 +113,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
               { key: 'status', title: 'Status', render: (r) => <Badge value={r.request_status} /> },
             ]}
           />
+          <Pagination {...requestPage.pagination} itemLabel="guest requests" />
         </Card>
 
         <div className="hk-stack">
@@ -140,7 +144,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
               <p className="hk-muted">No requests completed yet today.</p>
             ) : (
               <ul className="hk-list hk-list--plain">
-                {doneToday.map((r) => (
+                {completedPage.rows.map((r) => (
                   <li key={r.request_id}>
                     <span><strong>Room {r.room_number}</strong> · {label(r.request_type)}</span>
                     <small>{r.assigned_to?.trim() || '-'} · {formatDateTime(r.completed_at)}</small>
@@ -148,6 +152,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
                 ))}
               </ul>
             )}
+            <Pagination {...completedPage.pagination} itemLabel="completed requests" />
           </Card>
         </div>
       </div>

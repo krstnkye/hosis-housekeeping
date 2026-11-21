@@ -193,6 +193,13 @@ test('lost and found: invalid claim is rejected, valid claim releases', async ()
   });
   assert.equal(created.status, 201);
   assert.match(created.body.item.storage_label, /^LF-\d{4}$/);
+  assert.match(created.body.item.public_code, /^(?:[a-f0-9]{32}|[a-f0-9-]{36})$/);
+  const publicItem = await api('GET', `/public/lost-found/${created.body.item.public_code}`);
+  assert.equal(publicItem.status, 200, JSON.stringify(publicItem.body));
+  assert.equal(publicItem.body.item.storage_label, created.body.item.storage_label);
+  assert.equal(publicItem.body.item.item_description, 'Red scarf');
+  assert.equal(publicItem.body.item.storage_location, undefined);
+  assert.equal(publicItem.body.item.found_by, undefined);
   const itemId = created.body.item.item_id;
 
   const rejected = await api('POST', `/housekeeping/lost-found/${itemId}/claims`, {
@@ -462,6 +469,57 @@ test('account: staff see their account and change their own password', async () 
   assert.equal((await change('new-password-1', 'password123')).status, 200);
 });
 
+test('account: staff update their own profile but not protected employment fields', async () => {
+  const mark = await login('hk.mark');
+  const update = await api('PATCH', '/auth/account', {
+    token: mark.token,
+    body: { firstName: 'Marco', lastName: 'Tan', email: 'MARCO.TAN@GRANDHORIZON.PH', username: 'not-allowed' },
+  });
+  assert.equal(update.status, 200, JSON.stringify(update.body));
+  assert.equal(update.body.account.first_name, 'Marco');
+  assert.equal(update.body.account.email, 'marco.tan@grandhorizon.ph');
+  assert.equal(update.body.account.username, 'hk.mark');
+  assert.equal(update.body.user.name, 'Marco Tan');
+  assert.ok(update.body.token);
+
+  const refreshed = await api('GET', '/auth/account', { token: update.body.token });
+  assert.equal(refreshed.body.account.first_name, 'Marco');
+  assert.equal(refreshed.body.account.position, 'HOUSEKEEPER');
+  assert.equal((await api('PATCH', '/auth/account', {
+    token: update.body.token,
+    body: { firstName: 'Marco', lastName: 'Tan', email: 'liza.cruz@grandhorizon.ph' },
+  })).status, 409);
+  assert.equal((await api('PATCH', '/auth/account', {
+    token: update.body.token,
+    body: { firstName: 'Marco', lastName: 'Tan', email: 'not-an-email' },
+  })).status, 400);
+
+  // Restore the seeded profile for following tests and local demos.
+  await api('PATCH', '/auth/account', {
+    token: update.body.token,
+    body: { firstName: 'Mark', lastName: 'Tan', email: 'mark.tan@grandhorizon.ph' },
+  });
+});
+
+test('account: every staff member can add, replace and remove their profile photo', async () => {
+  const liza = await login('hk.liza');
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  const added = await api('PUT', '/auth/account/photo', { token: liza.token, body: { image: png } });
+  assert.equal(added.status, 200, JSON.stringify(added.body));
+  assert.equal(added.body.photo.content_type, 'image/png');
+  const account = await api('GET', '/auth/account', { token: liza.token });
+  assert.equal(account.body.account.has_profile_photo, true);
+
+  const image = await fetch(`${base}/auth/account/photo`, { headers: { Authorization: `Bearer ${liza.token}` } });
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.equal((await api('PUT', '/auth/account/photo', { token: liza.token, body: { image: 'data:text/html;base64,PGI+' } })).status, 400);
+
+  assert.equal((await api('DELETE', '/auth/account/photo', { token: liza.token })).status, 204);
+  assert.equal((await fetch(`${base}/auth/account/photo`, { headers: { Authorization: `Bearer ${liza.token}` } })).status, 404);
+});
+
 test('room condition: staff report to Front Office and see their reports and record', async () => {
   const liza = await login('hk.liza');
   const room = await roomId('104');
@@ -697,6 +755,38 @@ test('forgot password: supervisor sets a temporary password that must be changed
   assert.equal(after.body.requests.some((r) => r.username === 'hk.liza'), false);
 });
 
+test('staff accounts: only supervisors create approved accounts with one-time passwords', async () => {
+  const sup = await login('hk.supervisor');
+  const liza = await login('hk.liza');
+  await db.query(`DELETE FROM users WHERE username = 'hk.carla'`);
+  const account = {
+    firstName: 'Carla',
+    lastName: 'Medina',
+    username: 'HK.CARLA',
+    email: 'CARLA.MEDINA@GRANDHORIZON.PH',
+    position: 'HOUSEKEEPER',
+  };
+
+  const denied = await api('POST', '/housekeeping/password-resets/staff', { token: liza.token, body: account });
+  assert.equal(denied.status, 403);
+
+  const created = await api('POST', '/housekeeping/password-resets/staff', { token: sup.token, body: account });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.staff.username, 'hk.carla');
+  assert.equal(created.body.staff.email, 'carla.medina@grandhorizon.ph');
+  assert.match(created.body.temporaryPassword, /^Hk-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+
+  const duplicate = await api('POST', '/housekeeping/password-resets/staff', { token: sup.token, body: account });
+  assert.equal(duplicate.status, 409);
+
+  const signIn = await api('POST', '/auth/login', {
+    body: { username: 'hk.carla', password: created.body.temporaryPassword, department: 'HOUSEKEEPING' },
+  });
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.user.mustChangePassword, true);
+  assert.equal((await api('GET', '/housekeeping/rooms', { token: signIn.body.token })).status, 403);
+});
+
 test('sessions: a deactivated account is signed out right away', async () => {
   const mark = await login('hk.mark');
   await db.query(`UPDATE users SET employment_status = 'INACTIVE' WHERE username = 'hk.mark'`);
@@ -789,6 +879,52 @@ test('front office stand-ins: release an inspected room and check a guest in', a
   assert.equal(checkIn.body.room.room_status, 'OCCUPIED');
   const sup = await login('hk.supervisor');
   assert.equal((await api('POST', '/housekeeping/front-office/check-in', { token: sup.token, body: { roomId: room } })).status, 403);
+});
+
+test('front office integration: booking requests and checkout keep the reservation reference', async () => {
+  const fo = await loginAs('fo.desk', 'FRONT_OFFICE');
+  const sup = await login('hk.supervisor');
+  const room = await roomId('202');
+  const { rows: guests } = await db.query("SELECT guest_id FROM guests WHERE first_name = 'Grace' ORDER BY guest_id LIMIT 1");
+
+  const created = await api('POST', '/housekeeping/front-office/guest-requests', {
+    token: fo.token,
+    body: {
+      roomId: room,
+      guestId: guests[0].guest_id,
+      requestType: 'AMENITIES',
+      priority: 'HIGH',
+      details: 'Extra toiletries requested during the stay',
+      reservationReference: 'RES-2026-0202',
+    },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.request.reservation_reference, 'RES-2026-0202');
+  assert.equal(created.body.request.request_status, 'OPEN');
+
+  const bookingView = await api(
+    'GET',
+    '/housekeeping/front-office/guest-requests?reservationReference=RES-2026-0202',
+    { token: fo.token }
+  );
+  assert.equal(bookingView.status, 200);
+  assert.equal(bookingView.body.requests.length, 1);
+  assert.equal(bookingView.body.requests[0].room_number, '202');
+
+  const housekeepingView = await api('GET', '/housekeeping/guest-requests?view=all', { token: sup.token });
+  assert.ok(housekeepingView.body.requests.some((request) => request.reservation_reference === 'RES-2026-0202'));
+
+  const checkout = await api('POST', '/housekeeping/checkout', {
+    token: fo.token,
+    body: { roomId: room, reservationReference: 'RES-2026-0202' },
+  });
+  assert.equal(checkout.status, 201, JSON.stringify(checkout.body));
+  assert.equal(checkout.body.task.reservation_reference, 'RES-2026-0202');
+
+  assert.equal((await api('POST', '/housekeeping/front-office/guest-requests', {
+    token: sup.token,
+    body: { roomId: room, requestType: 'TOWELS', details: 'Not Front Office' },
+  })).status, 403);
 });
 
 test('stayover: cleaning an occupied room keeps it OCCUPIED and never offers it for sale', async () => {
@@ -976,4 +1112,66 @@ test('schedules: two overlapping shifts saved at the same moment cannot both be 
     api('POST', '/housekeeping/schedules', { token: sup.token, body: { ...base, shift: 'AFTERNOON', startTime: '10:00', endTime: '18:00' } }),
   ]);
   assert.deepEqual(results.map((r) => r.status).sort(), [201, 409]);
+});
+
+test('reports: supervisors can export a consolidated audit trail, regular staff cannot', async () => {
+  const sup = await login('hk.supervisor');
+  const staff = await login('hk.liza');
+  const report = await api('GET', '/housekeeping/audit?limit=25', { token: sup.token });
+  assert.equal(report.status, 200, JSON.stringify(report.body));
+  assert.ok(Array.isArray(report.body.events));
+  assert.ok(report.body.events.length > 0);
+  assert.ok(report.body.events.every((event) => event.event_id && event.category && event.occurred_at));
+  const denied = await api('GET', '/housekeeping/audit', { token: staff.token });
+  assert.equal(denied.status, 403);
+});
+
+test('staff reports: regular Housekeeping staff can view a coworker work record without private data', async () => {
+  const staff = await login('hk.liza');
+  const { rows } = await db.query(`SELECT user_id FROM users WHERE username = 'hk.mark'`);
+  const report = await api('GET', `/housekeeping/staff-records/${rows[0].user_id}`, { token: staff.token });
+  assert.equal(report.status, 200, JSON.stringify(report.body));
+  assert.equal(report.body.profile.user_id, rows[0].user_id);
+  assert.equal(report.body.profile.role, 'HOUSEKEEPING');
+  assert.equal(report.body.profile.email, undefined);
+  assert.equal(report.body.profile.password_hash, undefined);
+  assert.equal(typeof report.body.totals.tasks_completed, 'number');
+  assert.ok(Array.isArray(report.body.inspections));
+  assert.ok(Array.isArray(report.body.recent));
+});
+
+test('reports: weekly, monthly and annual periods return explicit date boundaries', async () => {
+  const sup = await login('hk.supervisor');
+  for (const period of ['WEEKLY', 'MONTHLY', 'ANNUAL']) {
+    const res = await api('GET', `/housekeeping/audit?period=${period}&anchor=2026-11-21`, { token: sup.token });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.report.period, period);
+    assert.match(res.body.report.from, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(res.body.report.to, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(res.body.report.from < res.body.report.to);
+  }
+});
+
+test('HR and Finance receive only their Housekeeping integration reports', async () => {
+  const { rows: source } = await db.query(`SELECT password_hash FROM users WHERE username = 'hk.supervisor'`);
+  await db.query(
+    `INSERT INTO users (first_name, last_name, username, email, password_hash, role, position)
+     VALUES ('Helen', 'Reyes', 'hr.officer', 'hr@example.test', $1, 'HR', NULL),
+            ('Felix', 'Cruz', 'finance.officer', 'finance@example.test', $1, 'FINANCE', NULL)
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, employment_status = 'ACTIVE'`,
+    [source[0].password_hash]
+  );
+  const hr = await loginAs('hr.officer');
+  const finance = await loginAs('finance.officer');
+  const from = new Date(Date.now() - 31 * 86400000).toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  const staff = await api('GET', `/housekeeping/integrations/hr/staff-summary?from=${from}&to=${to}`, { token: hr.token });
+  assert.equal(staff.status, 200, JSON.stringify(staff.body));
+  assert.ok(Array.isArray(staff.body.staff));
+  assert.ok(staff.body.staff.every((row) => row.claimant_contact === undefined));
+  const stock = await api('GET', `/housekeeping/integrations/finance/inventory-usage?from=${from}&to=${to}`, { token: finance.token });
+  assert.equal(stock.status, 200, JSON.stringify(stock.body));
+  assert.ok(Array.isArray(stock.body.inventory));
+  assert.equal((await api('GET', `/housekeeping/integrations/finance/inventory-usage?from=${from}&to=${to}`, { token: hr.token })).status, 403);
+  assert.equal((await api('GET', `/housekeeping/integrations/hr/staff-summary?from=${from}&to=${to}`, { token: finance.token })).status, 403);
 });

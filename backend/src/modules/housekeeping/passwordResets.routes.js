@@ -14,12 +14,70 @@ const router = express.Router();
 
 router.use(requirePosition('SUPERVISOR'));
 
+const STAFF_POSITIONS = ['HOUSEKEEPER', 'INSPECTOR', 'SUPERVISOR'];
+
 // Readable temporary password, e.g. "Hk-7Q4M-2XPA" (no 0/O or 1/I).
 function temporaryPassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const pick = (n) => Array.from(crypto.randomBytes(n), (b) => chars[b % chars.length]).join('');
   return `Hk-${pick(4)}-${pick(4)}`;
 }
+
+// POST /api/housekeeping/password-resets/staff
+// Creates an approved Housekeeping account. There is deliberately no public
+// sign-up route: a supervisor chooses the employee's role and gives them the
+// one-time password in person.
+router.post('/staff', async (req, res) => {
+  const body = req.body || {};
+  v.required(body, ['firstName', 'lastName', 'username', 'email', 'position']);
+  v.maxLengths(body, {
+    firstName: [50, 'First name'],
+    lastName: [50, 'Last name'],
+    username: [50, 'Username'],
+    email: [100, 'Email'],
+  });
+
+  const firstName = String(body.firstName).trim();
+  const lastName = String(body.lastName).trim();
+  const username = String(body.username).trim().toLowerCase();
+  const email = String(body.email).trim().toLowerCase();
+  const position = String(body.position).trim().toUpperCase();
+
+  v.oneOf(position, STAFF_POSITIONS, 'Position');
+  if (!/^[a-z0-9][a-z0-9._-]{2,49}$/.test(username)) {
+    throw new HttpError(400, 'Username must be 3 to 50 characters and use only letters, numbers, dots, underscores or hyphens.');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpError(400, 'Enter a valid email address.');
+  }
+
+  const password = temporaryPassword();
+  const hash = await bcrypt.hash(password, 10);
+  let staff;
+  try {
+    staff = await db.withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO users (first_name, last_name, username, email, password_hash, role, position)
+         VALUES ($1, $2, $3, $4, $5, 'HOUSEKEEPING', $6)
+         RETURNING user_id, username, email, position, employment_status,
+                   CONCAT(first_name, ' ', last_name) AS name`,
+        [firstName, lastName, username, email, hash, position]
+      );
+      await client.query(
+        `INSERT INTO hk_password_must_change (user_id, set_by) VALUES ($1, $2)`,
+        [rows[0].user_id, req.user.userId]
+      );
+      return rows[0];
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      throw new HttpError(409, 'That username or email is already assigned to an account.');
+    }
+    throw err;
+  }
+
+  res.status(201).json({ staff, temporaryPassword: password });
+});
 
 // GET /api/housekeeping/password-resets: open requests, newest first.
 router.get('/', async (req, res) => {

@@ -9,6 +9,7 @@ export const TABS = [
   { id: 'lost-found', name: 'Lost & Found', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 14v3' },
   { id: 'requests', name: 'Guest Requests', icon: 'M12 21a9 9 0 1 1 6.4-15.4M21 4l-9 9-3-3M9.5 15.5h4' },
   { id: 'maintenance', name: 'Maintenance', icon: 'M7 3h10v4H7zM9 7v14h6V7M9 12h6M9 16h6' },
+  { id: 'reports-audit', name: 'Reports & Audit', icon: 'M5 3h14v18H5zM8 8h8M8 12h8M8 16h5' },
   { id: 'staff-accounts', name: 'Staff Accounts', icon: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M17 8h5M19.5 5.5v5' },
 ]
 
@@ -16,11 +17,12 @@ export const TABS = [
 // to supervisors and inspectors alike.
 export const TAB_POSITIONS = {
   'staff-accounts': ['SUPERVISOR'],
+  'reports-audit': ['SUPERVISOR'],
 }
 
 // Extra pages in the housekeeping staff menu (Staff Dashboard).
 export const STAFF_TABS = [
   { id: 'report', name: 'Report Room', icon: 'M5 21V4h11l-1.5 4L16 12H5M9 8h2' },
-  { id: 'record', name: 'My Record', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6' },
+  { id: 'record', name: 'Staff Reports', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6' },
   { id: 'account', name: 'Account', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
 ]

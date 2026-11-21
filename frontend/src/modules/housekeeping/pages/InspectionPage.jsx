@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { api } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
 import { exportPdf } from '../exportReport.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const CHECKLIST = [
   { id: 'bed', title: 'Bed and linen', text: 'Fresh linen, bed made, no stains' },
@@ -50,7 +51,9 @@ export default function InspectionPage({ user }) {
   const canInspect = ['INSPECTOR', 'SUPERVISOR'].includes(user.position) || user.role === 'ADMIN'
 
   const rows = (list.data || []).filter((t) => !progress || t.task_status === progress)
-  const selected = rows.find((t) => t.task_id === selectedId) || rows[0]
+  const inspectionPage = usePagination(rows, 10, progress)
+  const activityPage = usePagination(activity.data?.activity || [], 5)
+  const selected = inspectionPage.rows.find((t) => t.task_id === selectedId) || inspectionPage.rows[0]
   const waiting = (list.data || []).filter((t) => t.task_status === 'COMPLETED').length
 
   return (
@@ -67,7 +70,7 @@ export default function InspectionPage({ user }) {
           <LoadState loading={list.loading && !list.data} error={list.error} />
           <DataTable
             rowKey="task_id"
-            rows={rows}
+            rows={inspectionPage.rows}
             selectedKey={selected?.task_id}
             onSelect={(t) => setSelectedId(t.task_id)}
             empty="No rooms with this progress."
@@ -77,6 +80,7 @@ export default function InspectionPage({ user }) {
               { key: 'priority', title: 'Priority', render: (t) => <Badge value={t.priority} /> },
             ]}
           />
+          <Pagination {...inspectionPage.pagination} itemLabel="inspection tasks" />
           <p className="hk-footnote">Oldest first; inspections can be prioritized by arrival time.</p>
           <div className="hk-report-bar">
             <button
@@ -87,13 +91,13 @@ export default function InspectionPage({ user }) {
             >
               Generate report
             </button>
-            <ExportMenu label="Export · PDF / Excel" title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
+            <ExportMenu label="Export · PDF / Excel / CSV" title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
           </div>
         </Card>
         <Card title="Recent activity" subtitle="Latest room status changes">
           {activity.data?.activity.length === 0 && <p className="hk-muted">No activity yet.</p>}
           <ul className="hk-list">
-            {(activity.data?.activity || []).slice(0, 8).map((a) => (
+            {activityPage.rows.map((a) => (
               <li key={a.log_id}>
                 <span>
                   Room {a.room_number}: {label(a.previous_status)} → <strong>{label(a.new_status)}</strong>
@@ -102,6 +106,7 @@ export default function InspectionPage({ user }) {
               </li>
             ))}
           </ul>
+          <Pagination {...activityPage.pagination} itemLabel="activity records" />
         </Card>
         {selected && (
           <Card title="Cleaning evidence">
@@ -145,6 +150,7 @@ export default function InspectionPage({ user }) {
 
 function InspectionHistory({ task }) {
   const history = useLoad(() => api.inspections(`?taskId=${task.task_id}`), [task.task_id])
+  const historyPage = usePagination(history.data?.inspections || [], 5, String(task.task_id))
   return (
     <Card title={`Room ${task.room_number} · ${task.room_type}`} subtitle={`${label(task.task_type)} cleaning by ${task.housekeeper?.trim() || '-'}`}>
       <div className="hk-badges"><Badge value={task.task_status}>{progressText(task.task_status)}</Badge><Badge value={task.priority}>{label(task.priority)} priority</Badge></div>
@@ -154,13 +160,14 @@ function InspectionHistory({ task }) {
       <h3 className="hk-subhead">Inspection results</h3>
       <LoadState loading={history.loading && !history.data} error={history.error} />
       <ul className="hk-list">
-        {(history.data?.inspections || []).map((i) => (
+        {historyPage.rows.map((i) => (
           <li key={i.inspection_id}>
             <span><Badge value={i.inspection_result} /> {i.remarks || 'No notes'}</span>
             <small>{i.inspector} · {formatDateTime(i.inspected_at)}</small>
           </li>
         ))}
       </ul>
+      <Pagination {...historyPage.pagination} itemLabel="inspection results" />
     </Card>
   )
 }

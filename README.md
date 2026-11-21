@@ -45,6 +45,12 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
    npm run dev               # http://localhost:5173
    ```
 
+   The development server also listens on the computer's LAN address so a
+   phone can scan a Lost & Found QR. Set `VITE_PUBLIC_APP_URL` in
+   `frontend/.env.local` to that address (for example
+   `http://192.168.186.109:5173` on the current network). Both devices must be on the same network.
+   Production must use the real public HTTPS HOSIS address.
+
 4. Run the API tests (they reload the seed, which resets Housekeeping data in
    the database in `DATABASE_URL`, so use a development or test database):
 
@@ -60,7 +66,7 @@ username also works).
 
 | Email / username | Position    | Can do                                              |
 | ---------------- | ----------- | --------------------------------------------------- |
-| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules, disposing found items, and resetting staff passwords |
+| `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules, audit/report exports, disposing found items, and resetting staff passwords |
 | `hk.inspector`  | Inspector   | Inspect rooms (not ones they cleaned), plus general housekeeping functions |
 | `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks and requests, lost & found, maintenance, room reports, approving stock for their guest requests |
 | `fo.desk`       | Front Office | Is denied at the Housekeeping login; uses the Front Office endpoints |
@@ -94,7 +100,7 @@ The sample data also has one waiting "Forgot password" request (from
 | HK-010 Record Found Item, Store / Label Item | Lost & Found | `POST /lost-found` (label `LF-0001`) |
 | HK-011 Search / View Records | Lost & Found | `GET /lost-found?search=` |
 | Valid Claim? / HK-012 Release Item | Lost & Found (ID type and number recorded) | `POST /lost-found/:id/claims` |
-| Item photos, QR storage label | Lost & Found | `POST /lost-found/:id/photos`, `GET /lost-found/:id/photos/:photoId` (QR made in the browser) |
+| Item photos, permanent QR storage label | Lost & Found | `POST /lost-found/:id/photos`, `GET /lost-found/:id/photos/:photoId`; each item gets a different non-expiring QR link to its privacy-safe HOSIS verification page |
 | Dispose of unclaimed item (supervisor) | Lost & Found | `POST /lost-found/:id/dispose` `{ reason }` |
 | HK-013 Record Request, Assign / Process | Guest Requests | `POST /guest-requests`, `PATCH /guest-requests/:id` |
 | HK-014 Complete Request | Guest Requests | `POST /guest-requests/:id/complete` |
@@ -103,10 +109,16 @@ The sample data also has one waiting "Forgot password" request (from
 | Update Status / Create Cleaning Task | Maintenance | `POST /maintenance/:id/release` |
 | Inventory stock for a guest request (Figma: Guest Request details) | Guest Requests (Inventory stock card, Approve request) | `POST /guest-requests` and `PATCH /guest-requests/:id` with `{ invItemId, quantity }`, `POST /guest-requests/:id/approve-stock` |
 | Stock list (no page; API only) | none | `GET /inventory`, `POST /inventory` (supervisor), `PATCH /inventory/:id` (supervisor), `POST /inventory/:id/movements`, `GET /inventory/movements` |
+| Reports and audit trail (supervisor) | Reports & Audit Trail | `GET /audit?period=WEEKLY|MONTHLY|ANNUAL&anchor=YYYY-MM-DD`; filtered PDF, Excel and CSV exports are generated in the browser |
 
 All API paths above are under `/api/housekeeping` and need a JWT from a
 HOUSEKEEPING (or ADMIN) account, except the Engineering and Front Office
 endpoints listed below.
+
+The QR destination `GET /api/public/lost-found/:publicCode` does not require a
+login. It returns only the item reference, description, found location/date,
+and current status. The random permanent code is not an authentication token;
+guest, claimant, staff, and internal storage information are never returned.
 
 ## Endpoints for other departments
 
@@ -115,6 +127,8 @@ endpoints listed below.
 | Front Office | `POST /api/housekeeping/checkout` `{ roomId }` | Guest checked out: OCCUPIED → DIRTY and a CHECKOUT cleaning task is created |
 | Front Office | `GET /api/housekeeping/notifications?unread=1` | Notices from Housekeeping: `notice_type` ROOM_READY (room passed inspection) or ROOM_CONDITION (a staff member's room condition report) |
 | Front Office | `PATCH /api/housekeeping/notifications/:id/read` | Mark a notice handled after releasing the room as AVAILABLE |
+| Front Office | `POST /api/housekeeping/front-office/guest-requests` `{ roomId, guestId?, reservationReference?, requestType, priority?, details }` | Send a booking-linked housekeeping request |
+| Front Office | `GET /api/housekeeping/front-office/guest-requests?reservationReference=` | Track housekeeping requests for a reservation |
 | Front Office (stand-in) | `GET /api/housekeeping/front-office/rooms` | Every room and its status |
 | Front Office (stand-in) | `POST /api/housekeeping/front-office/release` `{ roomId }` | INSPECTED → AVAILABLE; marks the room's "room ready" notices read |
 | Front Office (stand-in) | `POST /api/housekeeping/front-office/check-in` `{ roomId }` | AVAILABLE or RESERVED → OCCUPIED |
@@ -228,7 +242,7 @@ npm run frontoffice -- checkout 203     # OCCUPIED -> DIRTY + cleaning task
 | Schedules | No overlapping shifts; no shifts in the past |
 | Lost & Found | Photos, printable QR storage label, ID type and number on claims, supervisor-only disposal with a reason |
 | Guest Requests | Inventory stock card and Approve request from the Figma design; stock is taken out of inventory once approved |
-| Staff Accounts (new page) | Forgot-password requests and temporary passwords (supervisors) |
+| Staff Accounts | Supervisor-approved staff account creation, forgot-password requests, and one-time temporary passwords |
 | Account and My Record | Now also for supervisors and inspectors |
 | Sign-in | Lockout survives a restart; sessions end when the password changes or the account is deactivated |
 | Front Office demo | Stand-in endpoints and `npm run frontoffice` |

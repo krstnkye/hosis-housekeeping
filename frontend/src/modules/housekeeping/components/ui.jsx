@@ -103,6 +103,48 @@ export function DataTable({ columns, rows, rowKey, selectedKey, onSelect, empty 
   )
 }
 
+function paginationItems(current, total) {
+  const numbers = Array.from({ length: total }, (_, index) => index + 1)
+    .filter((number) => number === 1 || number === total || Math.abs(number - current) <= 1)
+  const items = []
+  numbers.forEach((number, index) => {
+    if (index && number - numbers[index - 1] > 1) items.push(`gap-${number}`)
+    items.push(number)
+  })
+  return items
+}
+
+export function Pagination({ page, pageSize, total, onPageChange, itemLabel = 'records' }) {
+  if (total <= pageSize) return null
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const first = total ? (currentPage - 1) * pageSize + 1 : 0
+  const last = Math.min(currentPage * pageSize, total)
+
+  return (
+    <nav className="hk-pagination" aria-label={`${itemLabel} pages`}>
+      <span>Showing {first}-{last} of {total} {itemLabel} · {pageSize} per page</span>
+      <div>
+        <button type="button" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}>Previous</button>
+        {paginationItems(currentPage, pageCount).map((item) => typeof item === 'string' ? (
+          <span key={item} className="hk-pagination__gap" aria-hidden="true">…</span>
+        ) : (
+          <button
+            type="button"
+            key={item}
+            className={item === currentPage ? 'is-active' : ''}
+            aria-current={item === currentPage ? 'page' : undefined}
+            onClick={() => onPageChange(item)}
+          >
+            {item}
+          </button>
+        ))}
+        <button type="button" disabled={currentPage === pageCount} onClick={() => onPageChange(currentPage + 1)}>Next</button>
+      </div>
+    </nav>
+  )
+}
+
 export function LoadState({ loading, error }) {
   if (error) return <Notice tone="red" title="Could not load data">{error.message}</Notice>
   if (loading) return <p className="hk-muted">Loading...</p>

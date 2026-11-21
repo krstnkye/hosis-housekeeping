@@ -16,6 +16,7 @@ import StaffAccountsPage from './pages/StaffAccountsPage.jsx'
 import LostFoundPage from './pages/LostFoundPage.jsx'
 import GuestRequestsPage from './pages/GuestRequestsPage.jsx'
 import MaintenancePage from './pages/MaintenancePage.jsx'
+import ReportsAuditPage from './pages/ReportsAuditPage.jsx'
 import './housekeeping.css'
 
 // Pages follow the flowchart: Log in -> Authorized? -> Housekeeping Dashboard
@@ -29,8 +30,9 @@ const PAGES = {
   'lost-found': { component: LostFoundPage, title: 'LOST & FOUND', subtitle: 'Record, store and return found belongings with verified claims.' },
   requests: { component: GuestRequestsPage, title: 'Guest Request', subtitle: 'Assign and resolve guest needs without losing track of open work.' },
   maintenance: { component: MaintenancePage, title: 'Maintenance', subtitle: 'Report defects, coordinate with Engineering and protect room readiness.' },
-  'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Forgotten passwords and temporary passwords for your team.' },
-  record: { component: PersonalRecordPage, title: 'Personal Record', subtitle: 'Your work history, inspection results and reports.' },
+  'reports-audit': { component: ReportsAuditPage, title: 'Reports & Audit Trail', subtitle: 'Review traceable housekeeping activity and export formal reports.' },
+  'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Create approved staff logins and manage temporary passwords.' },
+  record: { component: PersonalRecordPage, title: 'Staff Work Reports', subtitle: 'View and download your own or a coworker’s Housekeeping work record.' },
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 
@@ -40,7 +42,7 @@ const STAFF_PAGES = {
   overview: { component: StaffDashboardPage, title: 'Staff Dashboard', subtitle: 'Your rooms, guest requests and shift for today.' },
   schedules: { ...PAGES.schedules, title: 'Schedules', subtitle: 'Your shifts and assigned area, and who is on duty with you.' },
   report: { component: RoomReportPage, title: 'Report Room Condition', subtitle: 'Tell Front Office and Maintenance about a room’s condition.' },
-  record: { component: PersonalRecordPage, title: 'Personal Record', subtitle: 'Your work history, inspection results and reports.' },
+  record: { component: PersonalRecordPage, title: 'Staff Work Reports', subtitle: 'View and download your own or a coworker’s Housekeeping work record.' },
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 const ALL_TABS = [...TABS, ...STAFF_TABS]

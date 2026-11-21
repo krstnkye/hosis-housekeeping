@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination, SearchBox } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label, PRIORITIES } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
 
 const TASK_TYPES = ['CHECKOUT', 'STAYOVER', 'DEEP_CLEAN', 'TOUCH_UP', 'POST_REPAIR']
 // Filter groups from the Figma design: To Do / In Progress / Complete.
@@ -38,7 +39,8 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
       (!group || GROUPS[group].includes(t.task_status)) &&
       (!query || `${t.room_number} ${t.housekeeper || ''} ${t.task_type}`.toLowerCase().includes(query))
   )
-  const selected = creating ? null : list.find((t) => t.task_id === selectedId) || list[0]
+  const taskPage = usePagination(list, 10, `${mine}|${group}|${query}`)
+  const selected = creating ? null : taskPage.rows.find((t) => t.task_id === selectedId) || taskPage.rows[0]
 
   function refresh(taskId, msg) {
     setFlash(msg)
@@ -69,7 +71,7 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
           <LoadState loading={tasks.loading && !tasks.data} error={tasks.error} />
           <DataTable
             rowKey="task_id"
-            rows={list}
+            rows={taskPage.rows}
             selectedKey={selected?.task_id}
             onSelect={(t) => {
               setCreating(false)
@@ -82,6 +84,7 @@ export default function CleaningTasksPage({ user, search: topSearch }) {
               { key: 'status', title: 'Progress', render: (t) => <Badge value={t.task_status} /> },
             ]}
           />
+          <Pagination {...taskPage.pagination} itemLabel="cleaning tasks" />
           <p className="hk-footnote">Completed tasks move to Inspection. Returned tasks need re-cleaning.</p>
         </Card>
         <Card title="Housekeeper workload" subtitle="Completed / assigned today">

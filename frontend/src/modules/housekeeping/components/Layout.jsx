@@ -3,7 +3,7 @@ import { label } from '../format.js'
 import Icon from './Icon.jsx'
 import Modal from './Modal.jsx'
 import NotificationBell from './NotificationBell.jsx'
-import { api } from '../api.js'
+import { api, fetchImage } from '../api.js'
 import { Notice } from './ui.jsx'
 import { TABS } from '../tabs.js'
 import logoSidebar from '../assets/logo-sidebar.png'
@@ -102,21 +102,57 @@ export function Topbar({ user, onLogout, onMenu, menuOpen = false }) {
           <img src={logoMark} alt="Grand Horizon Hotel" className="hk-topbar__mark" />
         </div>
       )}
-      <NotificationBell />
-      <div className="hk-user">
-        <span className="hk-user__avatar" aria-hidden="true">
-          <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" size={18} />
-        </span>
-        <span className="hk-user__text">
-          <strong>{user.name}</strong>
-          <small>{user.position ? `Housekeeping ${label(user.position)} · Shared session active` : user.role}</small>
-        </span>
-        <button type="button" className="hk-btn hk-btn--end" onClick={() => setConfirm(true)}>
-          End session
-        </button>
+      <div className="hk-topbar__actions">
+        <NotificationBell />
+        <div className="hk-user">
+          <ProfileAvatar user={user} className="hk-user__avatar" />
+          <span className="hk-user__text">
+            <strong>{user.name}</strong>
+            <small>{user.position ? `Housekeeping ${label(user.position)} · Shared session active` : user.role}</small>
+          </span>
+          <button type="button" className="hk-btn hk-btn--end" onClick={() => setConfirm(true)}>
+            End session
+          </button>
+        </div>
       </div>
       {confirm && <EndSession onCancel={() => setConfirm(false)} onConfirm={onLogout} />}
     </header>
+  )
+}
+
+// Protected profile photos are loaded with the current session token. Account
+// changes emit an event so every visible avatar refreshes without a page reload.
+export function ProfileAvatar({ user, className = '' }) {
+  const [src, setSrc] = useState(null)
+  const [revision, setRevision] = useState(0)
+  const name = user?.name || 'User'
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase()
+
+  useEffect(() => {
+    const refresh = () => setRevision((value) => value + 1)
+    window.addEventListener('hosis-profile-photo-changed', refresh)
+    return () => window.removeEventListener('hosis-profile-photo-changed', refresh)
+  }, [])
+
+  useEffect(() => {
+    let url = null
+    let active = true
+    fetchImage(api.profilePhotoPath())
+      .then((next) => {
+        url = next
+        if (active) setSrc(next)
+      })
+      .catch(() => active && setSrc(null))
+    return () => {
+      active = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [revision])
+
+  return (
+    <span className={`hk-profile-avatar ${className}`.trim()}>
+      {src ? <img src={src} alt={`${name} profile`} /> : <span aria-hidden="true">{initials || 'U'}</span>}
+    </span>
   )
 }
 

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, fetchImage } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
 import Modal from '../components/Modal.jsx'
-import { Badge, Card, DataTable, Field, LoadState, Notice, SearchBox } from '../components/ui.jsx'
+import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination, SearchBox } from '../components/ui.jsx'
 import { formatDateTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
+import { usePagination } from '../usePagination.js'
+import { buildLostFoundQrPayload } from '../lostFoundQr.js'
 
 const ID_TYPES = [
   ['PASSPORT', 'Passport'],
@@ -48,10 +50,11 @@ export default function LostFoundPage({ search: topSearch, user }) {
   const list = (items.data?.items || [])
     .map((i) => (itemOverrides[i.item_id] ? { ...i, ...itemOverrides[i.item_id] } : i))
     .filter((i) => !query || `${i.storage_label} ${i.item_description} ${i.room_number || ''}`.toLowerCase().includes(query))
-  const selected = list.find((i) => i.item_id === selectedId) || list[0]
   const opened = list.find((i) => i.item_id === openId)
+  const itemPage = usePagination(list, 10, `${status}|${query}`)
+  const selected = itemPage.rows.find((i) => i.item_id === selectedId) || itemPage.rows[0]
 
-  function refresh(msg, itemId, updatedItem) {
+  function refresh(msg, itemId, updatedItem, options = {}) {
     setFlash(msg)
     setCreating(false)
     setOpenId(null)
@@ -59,6 +62,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
     if (updatedItem) {
       setItemOverrides((current) => ({ ...current, [updatedItem.item_id]: updatedItem }))
     }
+    if (options.showQr && updatedItem) setLabelFor(updatedItem)
     items.reload()
   }
 
@@ -87,7 +91,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
           <LoadState loading={items.loading && !items.data} error={items.error} />
           <DataTable
             rowKey="item_id"
-            rows={list}
+            rows={itemPage.rows}
             selectedKey={selected?.item_id}
             onSelect={(i) => setSelectedId(i.item_id)}
             darkHover
@@ -99,6 +103,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
               { key: 'status', title: 'Status', render: (i) => <Badge value={i.item_status} /> },
             ]}
           />
+          <Pagination {...itemPage.pagination} itemLabel="found items" />
           <div className="hk-actions hk-actions--split">
             <button type="button" className="hk-btn hk-btn--secondary" disabled={!selected} onClick={() => setOpenId(selected.item_id)}>
               View selected record →
@@ -124,8 +129,11 @@ export default function LostFoundPage({ search: topSearch, user }) {
                     {formatDateTime(selected.disposed_at)} · {selected.disposal_reason}
                   </Notice>
                 )}
+                <Notice tone="violet" title={`Permanent QR assigned to ${selected.storage_label}`}>
+                  This QR opens only this item’s public HOSIS record. Viewing, printing or downloading it does not create a new code.
+                </Notice>
                 <div className="hk-actions">
-                  <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setLabelFor(selected)}>Print label</button>
+                  <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setLabelFor(selected)}>View QR / Print label</button>
                   <button type="button" className="hk-btn hk-btn--primary" onClick={() => setOpenId(selected.item_id)}>
                     {selected.item_status === 'STORED' ? 'Found item → verify claim' : 'Found item →'}
                   </button>
@@ -145,7 +153,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
         </Modal>
       )}
       {labelFor && (
-        <Modal title={`Label ${labelFor.storage_label}`} onClose={() => setLabelFor(null)}>
+        <Modal title={`Permanent QR · ${labelFor.storage_label}`} onClose={() => setLabelFor(null)}>
           <ItemLabel item={labelFor} />
         </Modal>
       )}
@@ -161,19 +169,21 @@ export default function LostFoundPage({ search: topSearch, user }) {
 function ClaimHistory({ item }) {
   const claims = useLoad(() => api.itemClaims(item.item_id), [item.item_id, item.item_status])
   const list = claims.data?.claims || []
+  const claimPage = usePagination(list, 5, `${item.item_id}|${item.item_status}`)
   return (
     <Card title="Chain of custody">
       <div className="hk-custody">
         {item.storage_label} found by {item.found_by_name} in {item.room_number ? `room ${item.room_number}` : item.found_location} ({item.found_location}),
         stored at {item.storage_location}.
       </div>
-      {list.map((c) => (
+      {claimPage.rows.map((c) => (
         <div key={c.claim_id} className="hk-custody">
           {formatDateTime(c.claimed_at)}: claim by {c.claimant_name}
           {c.id_type ? ` (${ID_LABEL[c.id_type] || label(c.id_type)} ending ${c.id_last4})` : ''}{' '}
           {c.claim_status === 'VALID' ? 'verified and released' : 'rejected'} by {c.processed_by_name}.
         </div>
       ))}
+      <Pagination {...claimPage.pagination} itemLabel="claim records" />
       {item.item_status === 'DISPOSED' && (
         <div className="hk-custody">
           {formatDateTime(item.disposed_at)}: disposed by {item.disposed_by_name}. Reason: {item.disposal_reason}
@@ -202,7 +212,12 @@ function NewItemForm({ rooms, onSaved }) {
           // The item is saved; the photo can be added again from its record.
         }
       }
-      onSaved({ tone: 'green', title: `Item recorded as ${item.storage_label}`, text: `Label the item ${item.storage_label} and store it at ${item.storage_location}.` }, item.item_id, item)
+      onSaved(
+        { tone: 'green', title: `Item recorded as ${item.storage_label}`, text: 'Its unique permanent QR is ready to print or download.' },
+        item.item_id,
+        item,
+        { showQr: true }
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -211,7 +226,7 @@ function NewItemForm({ rooms, onSaved }) {
   }
 
   return (
-    <Card title="Record found item" subtitle="A storage label is generated when you save">
+    <Card title="Record found item" subtitle="Saving automatically creates a permanent QR used only for this item">
       <div className="hk-form">
         <Field label="Room">
           <select value={form.roomId} onChange={set('roomId')}>
@@ -236,7 +251,7 @@ function NewItemForm({ rooms, onSaved }) {
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
       <div className="hk-actions">
         <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !form.description || !form.foundLocation || !form.storageLocation} onClick={save}>
-          Save and label item
+          Save item & generate QR
         </button>
       </div>
     </Card>
@@ -482,22 +497,37 @@ function ItemPhoto({ path, alt }) {
   )
 }
 
-// Storage label with a QR code. Scanning it shows the label and description,
-// so the item can be matched to its record. Printed on its own page.
+// Permanent, item-specific storage label. The QR is plain text: no URL,
+// account token, server dependency, or expiry is embedded in it.
 function ItemLabel({ item }) {
   const [qr, setQr] = useState(null)
+  const [qrError, setQrError] = useState(null)
+  const qrLink = useMemo(() => {
+    try {
+      return { payload: buildLostFoundQrPayload(item), error: null }
+    } catch (error) {
+      return { payload: null, error: error.message }
+    }
+  }, [item])
+  const payload = qrLink.payload
   useEffect(() => {
     let active = true
+    if (!payload) return () => { active = false }
     import('qrcode')
       .then(({ default: QRCode }) =>
-        QRCode.toDataURL(`HOSIS LOST & FOUND\n${item.storage_label}\n${item.item_description}`, { margin: 1, width: 240 })
+        QRCode.toDataURL(payload, {
+          errorCorrectionLevel: 'Q',
+          margin: 2,
+          width: 360,
+          color: { dark: '#08052f', light: '#ffffff' },
+        })
       )
       .then((data) => active && setQr(data))
-      .catch(() => {})
+      .catch(() => active && setQrError('The QR code could not be generated. Please reopen this label.'))
     return () => {
       active = false
     }
-  }, [item])
+  }, [payload])
 
   function print() {
     document.body.classList.add('hk-printing-label')
@@ -509,8 +539,15 @@ function ItemLabel({ item }) {
     window.print()
   }
 
+  function download() {
+    const link = document.createElement('a')
+    link.href = qr
+    link.download = `${item.storage_label}-permanent-qr.png`
+    link.click()
+  }
+
   return (
-    <Card title="Storage label" subtitle="Print and attach it to the item or its bag">
+    <Card title="Permanent item-specific QR" subtitle="Print and attach it to this item or its bag">
       <div className="hk-print-label">
         {qr ? <img src={qr} alt={`QR code for ${item.storage_label}`} /> : <span className="hk-print-label__qr-wait">Making QR code...</span>}
         <div>
@@ -521,8 +558,21 @@ function ItemLabel({ item }) {
           <small>Grand Horizon Hotel · Housekeeping Lost &amp; Found</small>
         </div>
       </div>
+      {(qrError || qrLink.error) && <Notice tone="red" title="QR code unavailable">{qrError || qrLink.error}</Notice>}
+      <div className="hk-qr-assurance" role="status">
+        <strong>Permanent QR</strong>
+        <span>No expiration</span>
+        <span>Opens this item in HOSIS</span>
+        <span>Item-specific: {item.storage_label}</span>
+        <span>No guest or claimant personal data</span>
+      </div>
+      <details className="hk-qr-payload">
+        <summary>Show the permanent HOSIS link</summary>
+        <pre>{payload || 'QR link unavailable'}</pre>
+      </details>
       <div className="hk-actions">
         <button type="button" className="hk-btn hk-btn--primary" disabled={!qr} onClick={print}>Print label</button>
+        <button type="button" className="hk-btn hk-btn--secondary" disabled={!qr} onClick={download}>Download QR</button>
       </div>
     </Card>
   )
