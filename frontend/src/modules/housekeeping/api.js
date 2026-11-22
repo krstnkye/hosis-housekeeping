@@ -117,6 +117,7 @@ export const api = {
   guests: () => request('GET', `${HK}/guests`),
   notifications: () => request('GET', `${HK}/notifications`),
   alerts: () => request('GET', `${HK}/alerts`),
+  setAlertsReadState: (read) => request('PUT', `${HK}/alerts/read-state`, { read }),
   activity: () => request('GET', `${HK}/activity`),
   audit: (q = '') => request('GET', `${HK}/audit${q}`),
   staffAvailability: (date) => externalSession

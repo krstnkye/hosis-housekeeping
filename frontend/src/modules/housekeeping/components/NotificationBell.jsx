@@ -7,7 +7,9 @@ import Icon from './Icon.jsx'
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [alerts, setAlerts] = useState([])
-  const [seen, setSeen] = useState(0)
+  const [expanded, setExpanded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
@@ -36,7 +38,21 @@ export default function NotificationBell() {
     }
   }, [open])
 
-  const unread = Math.max(alerts.length - seen, 0)
+  const unread = alerts.filter((alert) => !alert.is_read).length
+  const visibleAlerts = expanded ? alerts : alerts.slice(0, 10)
+
+  async function updateReadState(read) {
+    setBusy(true)
+    setError('')
+    try {
+      await api.setAlertsReadState(read)
+      setAlerts((current) => current.map((alert) => ({ ...alert, is_read: read })))
+    } catch (err) {
+      setError(err.message || 'Could not update notifications.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="hk-bell" ref={ref}>
@@ -47,7 +63,8 @@ export default function NotificationBell() {
         aria-expanded={open}
         onClick={() => {
           setOpen(!open)
-          setSeen(alerts.length)
+          setExpanded(false)
+          setError('')
         }}
       >
         <Icon d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9zM10 20a2 2 0 0 0 4 0" size={22} />
@@ -55,11 +72,22 @@ export default function NotificationBell() {
       </button>
       {open && (
         <div className="hk-bell__panel" role="dialog" aria-label="Notifications">
-          <strong className="hk-bell__head">Notifications</strong>
+          <div className="hk-bell__header">
+            <strong className="hk-bell__head">Notifications</strong>
+            <div className="hk-bell__actions" aria-label="Notification actions">
+              <button type="button" disabled={busy || unread === 0} onClick={() => updateReadState(true)}>
+                Mark all read
+              </button>
+              <button type="button" disabled={busy || alerts.length === 0 || unread === alerts.length} onClick={() => updateReadState(false)}>
+                Mark all unread
+              </button>
+            </div>
+          </div>
+          {error && <p className="hk-bell__error" role="alert">{error}</p>}
           {alerts.length === 0 && <p className="hk-muted">You're all caught up.</p>}
           <ul>
-            {alerts.map((a, i) => (
-              <li key={`${a.type}-${i}`}>
+            {visibleAlerts.map((a, i) => (
+              <li key={`${a.type}-${a.at}-${i}`} className={a.is_read ? 'is-read' : 'is-unread'}>
                 <a
                   href={`#/housekeeping/${a.page}`}
                   onClick={() => setOpen(false)}
@@ -70,6 +98,11 @@ export default function NotificationBell() {
               </li>
             ))}
           </ul>
+          {alerts.length > 10 && (
+            <button type="button" className="hk-bell__view-all" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? 'Show less' : `View all (${alerts.length})`}
+            </button>
+          )}
         </div>
       )}
     </div>

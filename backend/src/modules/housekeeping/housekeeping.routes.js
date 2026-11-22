@@ -69,7 +69,9 @@ router.get('/dashboard', async (req, res) => {
 // Notification bell: things that need this user's attention right now.
 router.get('/alerts', async (req, res) => {
   const { rows } = await db.query(
-    `SELECT * FROM (
+    `SELECT a.*,
+            (p.read_through IS NOT NULL AND a.at <= p.read_through) AS is_read
+       FROM (
        SELECT 'ROOM_READY' AS type, n.message, n.created_at AS at, 'rooms' AS page
          FROM hk_front_office_notifications n
         WHERE n.created_at > NOW() - INTERVAL '1 day' AND n.notice_type = 'ROOM_READY' AND n.read_at IS NULL
@@ -103,7 +105,8 @@ router.get('/alerts', async (req, res) => {
          FROM hk_password_resets p JOIN users u ON u.user_id = p.user_id
         WHERE p.status = 'REQUESTED' AND $3
      ) a
-     ORDER BY at DESC NULLS LAST LIMIT 15`,
+     LEFT JOIN hk_alert_preferences p ON p.user_id = $1
+     ORDER BY a.at DESC NULLS LAST LIMIT 100`,
     [
       req.user.userId,
       ['INSPECTOR', 'SUPERVISOR'].includes(req.user.position) || req.user.role === 'ADMIN',
@@ -111,6 +114,24 @@ router.get('/alerts', async (req, res) => {
     ]
   );
   res.json({ alerts: rows });
+});
+
+router.put('/alerts/read-state', async (req, res) => {
+  if (typeof req.body?.read !== 'boolean') {
+    throw new HttpError(400, 'read must be true or false.');
+  }
+  if (req.body.read) {
+    await db.query(
+      `INSERT INTO hk_alert_preferences (user_id, read_through, updated_at)
+       VALUES ($1, NOW(), NOW())
+       ON CONFLICT (user_id) DO UPDATE
+       SET read_through = EXCLUDED.read_through, updated_at = NOW()`,
+      [req.user.userId]
+    );
+  } else {
+    await db.query('DELETE FROM hk_alert_preferences WHERE user_id = $1', [req.user.userId]);
+  }
+  res.json({ read: req.body.read });
 });
 
 // Recent activity: the latest room status changes (shown on the Inspection page).

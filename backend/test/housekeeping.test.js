@@ -334,6 +334,28 @@ test('login with email, alerts, activity and my schedule', async () => {
   assert.ok(all.body.requests.some((r) => r.request_status === 'COMPLETED'));
 });
 
+test('notification bulk read state is saved per Housekeeping user', async () => {
+  const sup = await login('hk.supervisor');
+  const inspector = await login('hk.inspector');
+  await db.query(
+    `INSERT INTO hk_front_office_notifications (room_id, notice_type, message, created_by)
+     VALUES ($1, 'ROOM_READY', 'Notification read-state test', $2)`,
+    [await roomId('101'), sup.user.userId]
+  );
+  const initial = await api('GET', '/housekeeping/alerts', { token: sup.token });
+  assert.ok(initial.body.alerts.some((alert) => alert.message === 'Notification read-state test' && alert.is_read === false));
+  assert.equal((await api('PUT', '/housekeeping/alerts/read-state', { token: sup.token, body: { read: true } })).status, 200);
+  const read = await api('GET', '/housekeeping/alerts', { token: sup.token });
+  assert.ok(read.body.alerts.length > 0);
+  assert.ok(read.body.alerts.every((alert) => alert.is_read === true));
+  const other = await api('GET', '/housekeeping/alerts', { token: inspector.token });
+  assert.ok(other.body.alerts.some((alert) => alert.message === 'Notification read-state test' && alert.is_read === false));
+  assert.equal((await api('PUT', '/housekeeping/alerts/read-state', { token: sup.token, body: { read: false } })).status, 200);
+  const unread = await api('GET', '/housekeeping/alerts', { token: sup.token });
+  assert.ok(unread.body.alerts.every((alert) => alert.is_read === false));
+  assert.equal((await api('PUT', '/housekeeping/alerts/read-state', { token: sup.token, body: { read: 'yes' } })).status, 400);
+});
+
 test('out of order: open cleaning cannot finish, release reopens the task', async () => {
   const joy = await login('hk.joy');
   const sup = await login('hk.supervisor');

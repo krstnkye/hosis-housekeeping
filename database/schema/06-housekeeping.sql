@@ -242,6 +242,14 @@ CREATE TABLE IF NOT EXISTS hk_password_must_change (
     set_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Per-user read state for the notification bell. A cutoff is enough because
+-- the bell contains current operational alerts rather than a permanent inbox.
+CREATE TABLE IF NOT EXISTS hk_alert_preferences (
+    user_id       INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    read_through  TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- INVENTORY_ITEM: linen, guest amenities and cleaning supplies.
 CREATE TABLE IF NOT EXISTS hk_inventory_items (
     inv_item_id   SERIAL PRIMARY KEY,
