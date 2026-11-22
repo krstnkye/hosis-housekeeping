@@ -86,7 +86,7 @@ function RoomDetail({ roomId, onSaved, readOnly }) {
   const [remarks, setRemarks] = useState('')
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(false)
-  const historyPage = usePagination(detail.data?.history || [], 5, String(roomId))
+  const historyPage = usePagination(detail.data?.history || [], 10, String(roomId))
 
   if (!detail.data) return <Card title="Room details"><LoadState loading={detail.loading} error={detail.error} /></Card>
   const { room, history, currentTask, allowedStatuses } = detail.data

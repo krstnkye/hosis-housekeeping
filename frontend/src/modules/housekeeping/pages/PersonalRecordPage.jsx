@@ -32,7 +32,7 @@ export default function PersonalRecordPage({ user }) {
     () => selectedId ? api.staffRecord(selectedId) : api.myRecord(),
     [selectedId]
   )
-  const inspectionPage = usePagination(data?.inspections || [], 5, String(selectedId))
+  const inspectionPage = usePagination(data?.inspections || [], 10, String(selectedId))
   if (!data) return <LoadState loading={loading} error={error} />
   const { profile: p, totals: t, inspections, recent } = data
 

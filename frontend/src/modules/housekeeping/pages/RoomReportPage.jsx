@@ -40,7 +40,7 @@ export default function RoomReportPage() {
   const [form, setForm] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
-  const reportPage = usePagination(reports.data?.reports || [], 5)
+  const reportPage = usePagination(reports.data?.reports || [], 10)
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
 
   if (!rooms.data) return <LoadState loading={rooms.loading} error={rooms.error} />

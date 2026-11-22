@@ -24,7 +24,7 @@ export default function MySchedulePage({ user }) {
   const assigned = isToday ? dayTasks.length : shift?.assigned_tasks || 0
   const completed = isToday ? dayTasks.filter((t) => DONE.includes(t.task_status)).length : shift?.completed_tasks || 0
   const remaining = dayTasks.filter((t) => !DONE.includes(t.task_status))
-  const roomPage = usePagination(remaining, 5, date)
+  const roomPage = usePagination(remaining, 10, date)
   const pct = assigned ? Math.round((completed / assigned) * 100) : 0
   const upcoming = schedules.filter((s) => s.shift_date > date).slice(0, 3)
 

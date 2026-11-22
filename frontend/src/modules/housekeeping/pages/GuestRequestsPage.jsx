@@ -46,7 +46,7 @@ export default function GuestRequestsPage({ search: topSearch, headerActions, us
   const today = new Date().toDateString()
   const doneToday = all.filter((r) => r.request_status === 'COMPLETED' && r.completed_at && new Date(r.completed_at).toDateString() === today)
   const requestPage = usePagination(list, 10, `${status}|${priority}|${query}`)
-  const completedPage = usePagination(doneToday, 5)
+  const completedPage = usePagination(doneToday, 10)
   const selected = requestPage.rows.find((r) => r.request_id === selectedId) || requestPage.rows[0]
 
   function refresh(msg) {

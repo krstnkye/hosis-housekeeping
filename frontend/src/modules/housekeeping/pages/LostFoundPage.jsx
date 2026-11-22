@@ -185,7 +185,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
 function ClaimHistory({ item }) {
   const claims = useLoad(() => api.itemClaims(item.item_id), [item.item_id, item.item_status])
   const list = claims.data?.claims || []
-  const claimPage = usePagination(list, 5, `${item.item_id}|${item.item_status}`)
+  const claimPage = usePagination(list, 10, `${item.item_id}|${item.item_status}`)
   return (
     <Card title="Chain of custody">
       <div className="hk-custody">

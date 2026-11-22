@@ -40,13 +40,13 @@ export default function StaffDashboardPage({ user }) {
     () => Promise.all([api.tasks('?mine=1'), api.guestRequests(), api.mySchedule(), api.alerts()]),
     []
   )
-  const taskPage = usePagination(data?.[0]?.tasks || [], 5)
+  const taskPage = usePagination(data?.[0]?.tasks || [], 10)
   const requestPage = usePagination(
     (data?.[1]?.requests || []).filter((request) => request.staff_id === user.userId),
-    5,
+    10,
     String(user.userId)
   )
-  const alertPage = usePagination(data?.[3]?.alerts || [], 5)
+  const alertPage = usePagination(data?.[3]?.alerts || [], 10)
   if (!data) return <LoadState loading={loading} error={error} />
   const [{ tasks }, { requests }, { schedules }, { alerts }] = data
 

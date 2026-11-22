@@ -51,7 +51,7 @@ export default function InspectionPage({ user }) {
 
   const rows = (list.data || []).filter((t) => !progress || t.task_status === progress)
   const inspectionPage = usePagination(rows, 10, progress)
-  const activityPage = usePagination(activity.data?.activity || [], 5)
+  const activityPage = usePagination(activity.data?.activity || [], 10)
   const selected = inspectionPage.rows.find((t) => t.task_id === selectedId) || inspectionPage.rows[0]
   const waiting = (list.data || []).filter((t) => t.task_status === 'COMPLETED').length
 
@@ -141,7 +141,7 @@ export default function InspectionPage({ user }) {
 
 function InspectionHistory({ task }) {
   const history = useLoad(() => api.inspections(`?taskId=${task.task_id}`), [task.task_id])
-  const historyPage = usePagination(history.data?.inspections || [], 5, String(task.task_id))
+  const historyPage = usePagination(history.data?.inspections || [], 10, String(task.task_id))
   return (
     <Card title={`Room ${task.room_number} · ${task.room_type}`} subtitle={`${label(task.task_type)} cleaning by ${task.housekeeper?.trim() || '-'}`}>
       <div className="hk-badges"><Badge value={task.task_status}>{progressText(task.task_status)}</Badge><Badge value={task.priority}>{label(task.priority)} priority</Badge></div>

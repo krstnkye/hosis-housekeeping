@@ -78,7 +78,7 @@ export default function StaffAccountsPage({ user }) {
 
   const pending = requests.data?.requests || []
   const team = (staff.data?.staff || []).filter((s) => s.user_id !== user.userId)
-  const requestPage = usePagination(pending, 5)
+  const requestPage = usePagination(pending, 10)
   const teamPage = usePagination(team, 10)
 
   return (
