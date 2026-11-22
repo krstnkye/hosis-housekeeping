@@ -6,12 +6,12 @@
 -- on a database that holds real hotel records. The automated tests run it
 -- before every test run.
 --
--- All accounts use the password: password123
+-- All accounts use the password: password12345
 -- Staff can sign in with their email or username.
 --   hk.supervisor  Housekeeping supervisor (can assign tasks and schedules),
 --                  email maria.santos@grandhorizon.ph
 --   hk.inspector   Housekeeping inspector  (can inspect rooms)
---   hk.liza / hk.joy / hk.mark  Housekeepers
+--   hk.housekeeper / hk.liza / hk.joy / hk.mark  Housekeepers
 --   fo.desk        Front Office account (denied at the Housekeeping login;
 --                  used to test the Front Office integration endpoints)
 --   eng.tech       Engineering account (used to test the Engineering
@@ -32,13 +32,14 @@ TRUNCATE hk_inventory_movements, hk_inventory_items, hk_password_must_change,
 RESTART IDENTITY;
 
 INSERT INTO users (first_name, last_name, username, email, password_hash, role, position) VALUES
-    ('Maria', 'Santos',    'hk.supervisor', 'maria.santos@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'SUPERVISOR'),
-    ('Ana',   'Reyes',     'hk.inspector',  'ana.reyes@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'INSPECTOR'),
-    ('Liza',  'Cruz',      'hk.liza',       'liza.cruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'HOUSEKEEPING', 'HOUSEKEEPER'),
-    ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'FRONT_OFFICE', NULL),
-    ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$UTSyYL.ukW1io4s4jPa4AeYIkmYga4KccIEkw6MnZ/zlUKRUNv4o6', 'ENGINEERING', 'TECHNICIAN')
+    ('Maria', 'Santos',    'hk.supervisor', 'maria.santos@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'SUPERVISOR'),
+    ('Ana',   'Reyes',     'hk.inspector',  'ana.reyes@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'INSPECTOR'),
+    ('Demo',  'Housekeeper','hk.housekeeper','hk.housekeeper@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Liza',  'Cruz',      'hk.liza',       'liza.cruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'FRONT_OFFICE', NULL),
+    ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'ENGINEERING', 'TECHNICIAN')
 ON CONFLICT (username) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash, employment_status = 'ACTIVE';
 
 INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES

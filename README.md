@@ -61,13 +61,14 @@ Housekeeping ERD in our documentation, and the HOSIS Housekeeping UI Figma file.
 
 ### Sample accounts
 
-All passwords are `password123`. Staff sign in with their email (the
+All passwords are `password12345`. Staff sign in with their email (the
 username also works).
 
 | Email / username | Position    | Can do                                              |
 | ---------------- | ----------- | --------------------------------------------------- |
 | `maria.santos@grandhorizon.ph` (`hk.supervisor`) | Supervisor  | Everything, incl. create/assign tasks and schedules, audit/report exports, disposing found items, and resetting staff passwords |
 | `hk.inspector`  | Inspector   | Inspect rooms (not ones they cleaned), plus general housekeeping functions |
+| `hk.housekeeper` | Housekeeper | Shared demo housekeeper credential matching the integrated HOSIS system |
 | `hk.liza`, `hk.joy`, `hk.mark` | Housekeeper | Work on their own tasks and requests, lost & found, maintenance, room reports, approving stock for their guest requests |
 | `fo.desk`       | Front Office | Is denied at the Housekeeping login; uses the Front Office endpoints |
 | `eng.tech`      | Engineering  | Is denied at the Housekeeping login; uses the Engineering endpoints |

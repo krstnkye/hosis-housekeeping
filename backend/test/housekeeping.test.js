@@ -59,14 +59,14 @@ async function api(method, path, { token, body } = {}) {
 
 async function login(username) {
   const res = await api('POST', '/auth/login', {
-    body: { username, password: 'password123', department: 'HOUSEKEEPING' },
+    body: { username, password: 'password12345', department: 'HOUSEKEEPING' },
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   return res.body;
 }
 
 async function loginAs(username, department) {
-  const res = await api('POST', '/auth/login', { body: { username, password: 'password123', department } });
+  const res = await api('POST', '/auth/login', { body: { username, password: 'password12345', department } });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   return res.body;
 }
@@ -85,7 +85,7 @@ test('login: wrong password and other departments are denied', async () => {
   const wrong = await api('POST', '/auth/login', { body: { username: 'hk.liza', password: 'nope' } });
   assert.equal(wrong.status, 401);
   const fo = await api('POST', '/auth/login', {
-    body: { username: 'fo.desk', password: 'password123', department: 'HOUSEKEEPING' },
+    body: { username: 'fo.desk', password: 'password12345', department: 'HOUSEKEEPING' },
   });
   assert.equal(fo.status, 403);
   assert.match(fo.body.error, /Access denied/);
@@ -312,7 +312,7 @@ test('schedules: supervisor creates, invalid times rejected', async () => {
 
 test('login with email, alerts, activity and my schedule', async () => {
   const byEmail = await api('POST', '/auth/login', {
-    body: { username: 'Maria.Santos@grandhorizon.ph', password: 'password123', department: 'HOUSEKEEPING' },
+    body: { username: 'Maria.Santos@grandhorizon.ph', password: 'password12345', department: 'HOUSEKEEPING' },
   });
   assert.equal(byEmail.status, 200);
   assert.equal(byEmail.body.user.username, 'hk.supervisor');
@@ -454,7 +454,7 @@ test('guest request: only housekeeping staff can be assigned', async () => {
 });
 
 test('front office: checkout creates a task, notifications can be marked read', async () => {
-  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password12345' } });
   const token = fo.body.token;
   const sup = await login('hk.supervisor');
 
@@ -489,21 +489,21 @@ test('account: staff see their account and change their own password', async () 
   const change = (currentPassword, newPassword) =>
     api('POST', '/auth/password', { token: joy.token, body: { currentPassword, newPassword } });
   assert.equal((await change('wrong-password', 'new-password-1')).status, 400);
-  assert.equal((await change('password123', 'short')).status, 400);
-  assert.equal((await change('password123', 'password123')).status, 400);
-  const changed = await change('password123', 'new-password-1');
+  assert.equal((await change('password12345', 'short')).status, 400);
+  assert.equal((await change('password12345', 'password12345')).status, 400);
+  const changed = await change('password12345', 'new-password-1');
   assert.equal(changed.status, 200);
   // The old token stops working; the response carries a new one.
   assert.equal((await api('GET', '/auth/account', { token: joy.token })).status, 401);
   assert.ok(changed.body.token);
   joy.token = changed.body.token;
 
-  const old = await api('POST', '/auth/login', { body: { username: 'hk.joy', password: 'password123', department: 'HOUSEKEEPING' } });
+  const old = await api('POST', '/auth/login', { body: { username: 'hk.joy', password: 'password12345', department: 'HOUSEKEEPING' } });
   assert.equal(old.status, 401);
   const fresh = await api('POST', '/auth/login', { body: { username: 'hk.joy', password: 'new-password-1', department: 'HOUSEKEEPING' } });
   assert.equal(fresh.status, 200);
   // Put the demo password back for the other tests.
-  assert.equal((await change('new-password-1', 'password123')).status, 200);
+  assert.equal((await change('new-password-1', 'password12345')).status, 200);
 });
 
 test('account: staff update their own profile but not protected employment fields', async () => {
@@ -570,7 +570,7 @@ test('room condition: staff report to Front Office and see their reports and rec
   assert.equal(sent.body.notification.notice_type, 'ROOM_CONDITION');
   assert.match(sent.body.notification.message, /Room 104 condition \(damaged\): Cracked bathroom mirror/);
 
-  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password12345' } });
   const notices = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.body.token });
   assert.ok(notices.body.notifications.some((n) => n.notification_id === sent.body.notification.notification_id && n.notice_type === 'ROOM_CONDITION'));
 
@@ -783,7 +783,7 @@ test('forgot password: supervisor sets a temporary password that must be changed
   assert.equal(signIn.status, 200);
   assert.equal(signIn.body.user.mustChangePassword, true);
   assert.equal((await api('GET', '/housekeeping/rooms', { token: signIn.body.token })).status, 403);
-  const changed = await api('POST', '/auth/password', { token: signIn.body.token, body: { currentPassword: temp, newPassword: 'password123' } });
+  const changed = await api('POST', '/auth/password', { token: signIn.body.token, body: { currentPassword: temp, newPassword: 'password12345' } });
   assert.equal(changed.status, 200);
   assert.equal(changed.body.user.mustChangePassword, false);
   assert.equal((await api('GET', '/housekeeping/rooms', { token: changed.body.token })).status, 200);
@@ -986,7 +986,7 @@ test('stayover: cleaning an occupied room keeps it OCCUPIED and never offers it 
   const after = await db.query('SELECT COUNT(*)::int AS n FROM hk_front_office_notifications WHERE room_id = $1', [room]);
   assert.equal(after.rows[0].n, before.rows[0].n);
   // Front Office can still check the guest out normally.
-  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password123' } });
+  const fo = await api('POST', '/auth/login', { body: { username: 'fo.desk', password: 'password12345' } });
   assert.equal((await api('POST', '/housekeeping/checkout', { token: fo.body.token, body: { roomId: room } })).status, 201);
 });
 

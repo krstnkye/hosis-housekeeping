@@ -9,7 +9,7 @@
 // The backend must be running. API_URL defaults to http://localhost:5000/api.
 const API = process.env.API_URL || 'http://localhost:5000/api';
 const USERNAME = process.env.ENG_USERNAME || 'eng.tech';
-const PASSWORD = process.env.ENG_PASSWORD || 'password123';
+const PASSWORD = process.env.ENG_PASSWORD || 'password12345';
 
 async function call(method, path, token, body) {
   const res = await fetch(API + path, {

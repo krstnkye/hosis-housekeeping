@@ -12,7 +12,7 @@
 // API_URL defaults to http://localhost:5000/api.
 const API = process.env.API_URL || 'http://localhost:5000/api';
 const USERNAME = process.env.FO_USERNAME || 'fo.desk';
-const PASSWORD = process.env.FO_PASSWORD || 'password123';
+const PASSWORD = process.env.FO_PASSWORD || 'password12345';
 
 async function call(method, path, token, body) {
   const res = await fetch(API + path, {
