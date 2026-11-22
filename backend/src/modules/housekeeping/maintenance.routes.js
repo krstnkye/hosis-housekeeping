@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
+const { requirePosition } = require('../../middleware/auth');
 const { changeRoomStatus, lockRoom } = require('./roomStatus');
 
 // Housekeeping side of maintenance (HK-015). Engineering's side
@@ -41,6 +42,9 @@ router.post('/', async (req, res) => {
   v.maxLengths(body, { description: [255, 'Description'] });
   const roomId = v.id(body.roomId, 'room');
   const setOutOfOrder = body.setOutOfOrder === true;
+  if (setOutOfOrder && req.user.role !== 'ADMIN' && req.user.position !== 'SUPERVISOR') {
+    throw new HttpError(403, 'Only supervisors may take a room out of service.');
+  }
 
   const request = await db.withTransaction(async (client) => {
     const room = await lockRoom(client, roomId);
@@ -81,24 +85,34 @@ router.patch('/:id', async (req, res) => {
   v.oneOf(body.priority, v.PRIORITIES, 'priority');
   v.maxLengths(body, { description: [255, 'Description'] });
   v.notBlank(body, { description: 'Description' });
-  const { rows } = await db.query(
-    `UPDATE hk_maintenance_requests
-        SET priority = COALESCE($1, priority),
-            issue_description = COALESCE($2, issue_description)
-      WHERE request_id = $3 AND status <> 'CLOSED' RETURNING *`,
-    [body.priority || null, body.description || null, requestId]
-  );
-  if (!rows[0]) {
-    throw new HttpError(409, 'Request not found or already closed.');
-  }
-  res.json({ request: rows[0] });
+  const canManageAll = req.user.role === 'ADMIN' || req.user.position === 'SUPERVISOR';
+  const request = await db.withTransaction(async (client) => {
+    const { rows: found } = await client.query(
+      'SELECT * FROM hk_maintenance_requests WHERE request_id = $1 FOR UPDATE',
+      [requestId]
+    );
+    if (!found[0]) throw new HttpError(404, 'Maintenance request not found.');
+    if (found[0].status === 'CLOSED') throw new HttpError(409, 'This maintenance request is already closed.');
+    if (!canManageAll && found[0].reported_by !== req.user.userId) {
+      throw new HttpError(403, 'Only the reporting staff member or a supervisor can edit this request.');
+    }
+    const { rows } = await client.query(
+      `UPDATE hk_maintenance_requests
+          SET priority = COALESCE($1, priority),
+              issue_description = COALESCE($2, issue_description)
+        WHERE request_id = $3 RETURNING *`,
+      [body.priority || null, body.description || null, requestId]
+    );
+    return rows[0];
+  });
+  res.json({ request });
 });
 
 // After Engineering marks the repair REPAIRED, Housekeeping releases the room:
 // OUT_OF_ORDER -> DIRTY, the request is closed, and the room gets a
 // high-priority cleaning task. A cleaning task that was still open when the
 // room went out of order is reopened instead of creating a second one.
-router.post('/:id/release', async (req, res) => {
+router.post('/:id/release', requirePosition('SUPERVISOR'), async (req, res) => {
   const requestId = v.id(req.params.id, 'request id');
   const result = await db.withTransaction(async (client) => {
     const { rows } = await client.query(

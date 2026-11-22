@@ -13,7 +13,8 @@ export default function ExportMenu({ title, fileName, columns, rows, label = 'Ex
     try {
       await fn({ title, fileName, columns, rows })
     } catch (err) {
-      setError(err.message || 'Export failed')
+      console.error('Housekeeping report export failed:', err)
+      setError('The report could not be created. Refresh the page and try again.')
     }
   }
 

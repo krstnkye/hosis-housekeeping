@@ -2,9 +2,11 @@ const express = require('express');
 const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
-const { ROOM_STATUSES, MANUAL_TRANSITIONS, changeRoomStatus } = require('./roomStatus');
+const { requirePosition } = require('../../middleware/auth');
+const { ROOM_STATUSES, changeRoomStatus } = require('./roomStatus');
 
 const router = express.Router();
+const canOverride = (user) => user.role === 'ADMIN' || user.position === 'SUPERVISOR';
 
 // HK-001: view room status, with counts for the summary cards.
 router.get('/', async (req, res) => {
@@ -67,25 +69,22 @@ router.get('/:id', async (req, res) => {
     room,
     history,
     currentTask: tasks[0] || null,
-    allowedStatuses: MANUAL_TRANSITIONS[room.room_status],
+    allowedStatuses: canOverride(req.user) && room.room_status !== 'DIRTY' ? ['DIRTY'] : [],
   });
 });
 
-// HK-003: update room status by hand (logged). INSPECTED and OUT_OF_ORDER have
-// their own workflows, so they are refused here.
-router.patch('/:id/status', async (req, res) => {
+// Manual status correction is supervisor-only. CLEAN, INSPECTED,
+// OUT_OF_ORDER and Front Office states have dedicated workflows.
+router.patch('/:id/status', requirePosition('SUPERVISOR'), async (req, res) => {
   const roomId = v.id(req.params.id, 'room id');
   v.required(req.body, ['status']);
   v.oneOf(req.body.status, ROOM_STATUSES, 'status');
-  if (req.body.status === 'INSPECTED') {
-    throw new HttpError(409, 'A room becomes INSPECTED only by passing an inspection on the Inspection page.');
-  }
-  if (req.body.status === 'CLEAN') {
-    throw new HttpError(409, 'A room becomes CLEAN when its cleaning task is completed on the Cleaning Tasks page, so it then goes to inspection.');
-  }
   v.maxLengths(req.body, { remarks: [255, 'Remarks'] });
-  if (req.body.status === 'OUT_OF_ORDER') {
-    throw new HttpError(409, 'Report the problem on the Maintenance page to set a room OUT OF ORDER.');
+  if (req.body.status !== 'DIRTY') {
+    throw new HttpError(400, 'Use Cleaning Tasks, Inspection, Maintenance or Front Office to make that room-status change.');
+  }
+  if (!(typeof req.body.remarks === 'string' && req.body.remarks.trim())) {
+    throw new HttpError(400, 'Enter a reason for the supervisor status correction.');
   }
   const room = await db.withTransaction(async (client) => {
     const updated = await changeRoomStatus(client, {

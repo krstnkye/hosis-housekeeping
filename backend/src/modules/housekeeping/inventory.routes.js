@@ -133,8 +133,8 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
 });
 
 // POST /inventory/:id/movements  { type: IN | OUT | ADJUST, quantity, roomId?, remarks? }
-// IN adds, OUT takes away (cannot go below zero), ADJUST sets the counted
-// quantity (supervisors only, remarks required).
+// Receiving stock and correcting counts are supervisors-only. Assigned staff
+// may record normal stock usage (OUT).
 router.post('/:id/movements', async (req, res) => {
   const itemId = v.id(req.params.id, 'item id');
   const body = req.body || {};
@@ -142,12 +142,13 @@ router.post('/:id/movements', async (req, res) => {
   v.oneOf(body.type, TYPES, 'type');
   v.maxLengths(body, { remarks: [255, 'Remarks'] });
   const isAdjust = body.type === 'ADJUST';
+  const isSupervisor = req.user.position === 'SUPERVISOR' || req.user.role === 'ADMIN';
+  if (body.type !== 'OUT' && !isSupervisor) {
+    throw new HttpError(403, 'Only supervisors can receive stock or record a stock count.');
+  }
   const quantity = v.int(body.quantity, isAdjust ? 'Counted quantity' : 'Quantity', { min: isAdjust ? 0 : 1 });
   const roomId = v.optionalId(body.roomId, 'room');
   if (isAdjust) {
-    if (req.user.position !== 'SUPERVISOR' && req.user.role !== 'ADMIN') {
-      throw new HttpError(403, 'Only supervisors can record a stock count.');
-    }
     if (!body.remarks) {
       throw new HttpError(400, 'Write why the stock count differs (e.g. monthly count, damaged linen).');
     }

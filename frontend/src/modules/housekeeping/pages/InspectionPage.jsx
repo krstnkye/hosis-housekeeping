@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import ExportMenu from '../components/ExportMenu.jsx'
-import { exportPdf } from '../exportReport.js'
 import { Badge, Card, DataTable, Field, LoadState, Notice, Pagination } from '../components/ui.jsx'
 import { formatDateTime, formatTime, label } from '../format.js'
 import { useLoad } from '../useLoad.js'
@@ -83,14 +82,6 @@ export default function InspectionPage({ user }) {
           <Pagination {...inspectionPage.pagination} itemLabel="inspection tasks" />
           <p className="hk-footnote">Oldest first; inspections can be prioritized by arrival time.</p>
           <div className="hk-report-bar">
-            <button
-              type="button"
-              className="hk-btn hk-btn--secondary hk-btn--block"
-              disabled={!rows.length}
-              onClick={() => exportPdf({ title: 'Room Inspection Report', fileName: 'inspection-report', columns: REPORT_COLUMNS, rows })}
-            >
-              Generate report
-            </button>
             <ExportMenu label="Export · PDF / Excel / CSV" title="Room Inspection Report" fileName="inspection-report" columns={REPORT_COLUMNS} rows={rows} />
           </div>
         </Card>

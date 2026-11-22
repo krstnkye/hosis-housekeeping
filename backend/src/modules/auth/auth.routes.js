@@ -5,6 +5,7 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const { authenticate, passwordVersion } = require('../../middleware/auth');
 const { checkLoginAllowed, recordLoginFailure, clearLoginFailures } = require('../../middleware/loginLimiter');
+const { isSupportedImageData } = require('../../utils/imageUpload');
 
 const router = express.Router();
 const PROFILE_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -194,8 +195,8 @@ router.put('/account/photo', authenticate, async (req, res) => {
     throw new HttpError(400, 'Upload a JPEG, PNG or WebP profile photo.');
   }
   const data = Buffer.from(match[2], 'base64');
-  if (!data.length || data.length > MAX_PROFILE_PHOTO_BYTES) {
-    throw new HttpError(400, 'Profile photos must be 2 MB or smaller.');
+  if (!data.length || data.length > MAX_PROFILE_PHOTO_BYTES || !isSupportedImageData(data, match[1])) {
+    throw new HttpError(400, 'Upload a valid JPEG, PNG or WebP photo no larger than 2 MB.');
   }
   const { rows } = await db.query(
     `INSERT INTO hk_staff_profile_photos (user_id, content_type, data)

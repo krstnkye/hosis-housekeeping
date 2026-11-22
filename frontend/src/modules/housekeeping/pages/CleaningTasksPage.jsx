@@ -134,7 +134,7 @@ function TaskForm({ task, rooms, staff, user, isSupervisor, onNew, onSaved }) {
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
   const isNew = !task
-  const canWork = task && (task.staff_id === user.userId || isSupervisor)
+  const canWork = task && task.staff_id === user.userId
   const closed = task?.task_status === 'INSPECTED'
 
   async function run(action, successText) {

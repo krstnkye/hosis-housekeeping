@@ -169,9 +169,10 @@ router.patch('/:id', requirePosition('SUPERVISOR'), async (req, res) => {
   res.json({ task });
 });
 
-// The assigned housekeeper (or a supervisor) may update task progress.
+// Only the assigned staff member may update task progress. Supervisors can
+// reassign work, but cannot perform actions under another employee's name.
 function canWorkOn(user, task) {
-  return task.staff_id === user.userId || user.position === 'SUPERVISOR' || user.role === 'ADMIN';
+  return task.staff_id === user.userId;
 }
 
 // HK-006: start cleaning.

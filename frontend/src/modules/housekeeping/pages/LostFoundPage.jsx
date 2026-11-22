@@ -144,7 +144,7 @@ export default function LostFoundPage({ search: topSearch, user }) {
                 <div className="hk-actions">
                   <button type="button" className="hk-btn hk-btn--secondary" onClick={() => setLabelFor(selected)}>View QR / Print label</button>
                   <button type="button" className="hk-btn hk-btn--primary" onClick={() => setOpenId(selected.item_id)}>
-                    {selected.item_status === 'STORED' ? 'Found item → verify claim' : 'Found item →'}
+                    {selected.item_status === 'STORED' && supervisor ? 'Found item → verify claim' : 'View item record →'}
                   </button>
                 </div>
               </Card>
@@ -158,7 +158,14 @@ export default function LostFoundPage({ search: topSearch, user }) {
 
       {opened && (
         <Modal title={`Found item ${opened.storage_label}`} onClose={() => setOpenId(null)}>
-          <ItemDetail key={opened.item_id} item={opened} onSaved={refresh} supervisor={supervisor} onPhotoAdded={items.reload} />
+          <ItemDetail
+            key={opened.item_id}
+            item={opened}
+            onSaved={refresh}
+            supervisor={supervisor}
+            canManage={supervisor || opened.found_by === user?.userId}
+            onPhotoAdded={items.reload}
+          />
         </Modal>
       )}
       {labelFor && (
@@ -267,7 +274,7 @@ function NewItemForm({ rooms, onSaved }) {
   )
 }
 
-function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
+function ItemDetail({ item, onSaved, supervisor, canManage, onPhotoAdded }) {
   const [form, setForm] = useState({ description: item.item_description, storageLocation: item.storage_location })
   const [claim, setClaim] = useState({ claimantName: '', claimantContact: '', idType: '', idNumber: '', idVerified: false, descriptionMatch: false })
   const [disposeReason, setDisposeReason] = useState('')
@@ -337,7 +344,7 @@ function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
       <h3 className="hk-subhead">Item photos</h3>
       <p className="hk-muted">Photos help staff identify the belonging and verify a claimant.</p>
       {photos.length ? <PhotoStrip item={{ ...item, photo_ids: photos }} /> : <p className="hk-muted">No photos yet.</p>}
-      {stored && photos.length < 3 && (
+      {stored && canManage && photos.length < 3 && (
         <div className="hk-actions hk-actions--left">
           <PhotoPicker onPick={addPhoto} onError={setError} label="Add photo" />
         </div>
@@ -350,17 +357,17 @@ function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
           <input value={`${item.room_number ? `Room ${item.room_number} · ` : ''}${item.found_location}`} disabled />
         </Field>
         <Field label="Item description" wide>
-          <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={!stored} />
+          <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={!stored || !canManage} />
         </Field>
         <Field label="Storage location / label">
-          <input value={form.storageLocation} onChange={(e) => setForm({ ...form, storageLocation: e.target.value })} disabled={!stored} />
+          <input value={form.storageLocation} onChange={(e) => setForm({ ...form, storageLocation: e.target.value })} disabled={!stored || !canManage} />
         </Field>
         <Field label="Item status">
           <input value={label(item.item_status)} disabled />
         </Field>
       </div>
 
-      {stored && (
+      {stored && supervisor ? (
         <>
           <h3 className="hk-subhead">Claimant verification</h3>
           <div className="hk-form">
@@ -396,17 +403,23 @@ function ItemDetail({ item, onSaved, supervisor, onPhotoAdded }) {
             </Notice>
           )}
         </>
-      )}
+      ) : stored ? (
+        <Notice tone="violet" title="Supervisor approval required">
+          Housekeeping staff can document and locate the item. Only a supervisor can verify a claimant, release the item or record its disposal.
+        </Notice>
+      ) : null}
       {error && <Notice tone="red" title="Not saved">{error}</Notice>}
-      {stored && (
+      {stored && (canManage || supervisor) && (
         <div className="hk-actions">
-          <button type="button" className="hk-btn hk-btn--secondary" disabled={busy} onClick={update}>Save item details</button>
-          <button type="button" className="hk-btn hk-btn--secondary" disabled={busy || !hasClaimant || verified} onClick={processClaim}>
-            Record rejected claim
-          </button>
-          <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !releaseReady} onClick={processClaim}>
-            Release item
-          </button>
+          {canManage && <button type="button" className="hk-btn hk-btn--secondary" disabled={busy} onClick={update}>Save item details</button>}
+          {supervisor && <>
+            <button type="button" className="hk-btn hk-btn--secondary" disabled={busy || !hasClaimant || verified} onClick={processClaim}>
+              Record rejected claim
+            </button>
+            <button type="button" className="hk-btn hk-btn--primary" disabled={busy || !releaseReady} onClick={processClaim}>
+              Release item
+            </button>
+          </>}
         </div>
       )}
       {stored && supervisor && (
@@ -490,8 +503,6 @@ function ItemPhoto({ path, alt }) {
   useEffect(() => {
     let url = null
     let active = true
-    setSrc(null)
-    setFailed(false)
     fetchImage(path)
       .then((u) => {
         url = u

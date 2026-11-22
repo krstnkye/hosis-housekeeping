@@ -6,6 +6,7 @@ const { requirePosition } = require('../../middleware/auth');
 const { changeRoomStatus, assertNotOutOfOrder, FRONT_OFFICE_HELD } = require('./roomStatus');
 
 const router = express.Router();
+const REQUIRED_CHECKS = ['bed', 'bathroom', 'amenities', 'floors', 'fixtures'];
 
 // Rooms waiting for inspection: tasks that are cleaned but not yet inspected.
 router.get('/queue', async (req, res) => {
@@ -56,7 +57,13 @@ router.post('/', requirePosition('INSPECTOR', 'SUPERVISOR'), async (req, res) =>
     throw new HttpError(400, 'Please write what needs re-cleaning when an inspection fails.');
   }
   v.maxLengths(body, { remarks: [255, 'Remarks'] });
-  const checklist = body.checklist && typeof body.checklist === 'object' ? body.checklist : {};
+  if (body.checklist !== undefined && (!body.checklist || typeof body.checklist !== 'object' || Array.isArray(body.checklist))) {
+    throw new HttpError(400, 'Inspection checklist must be an object.');
+  }
+  const checklist = body.checklist || {};
+  if (body.result === 'PASSED' && !REQUIRED_CHECKS.every((name) => checklist[name] === true)) {
+    throw new HttpError(400, 'Complete every inspection checklist item before passing the room.');
+  }
 
   const result = await db.withTransaction(async (client) => {
     const { rows: tasks } = await client.query(

@@ -1,13 +1,20 @@
-// PDF and Excel exports for the Housekeeping lists. The libraries load
-// only when someone exports, so normal page loads stay small.
+import { jsPDF } from 'jspdf'
+import { autoTable } from 'jspdf-autotable'
+import writeXlsxFile from 'write-excel-file/browser'
+
+// Bundling the report libraries with the application avoids stale
+// development-server module URLs after a restart or update.
 
 function stamp() {
   return new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+export function spreadsheetText(value) {
+  const text = String(value ?? '')
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+}
+
 export async function exportPdf({ title, fileName, columns, rows }) {
-  const { jsPDF } = await import('jspdf')
-  const { autoTable } = await import('jspdf-autotable')
   const doc = new jsPDF({ orientation: columns.length > 5 ? 'landscape' : 'portrait' })
   doc.setFontSize(14)
   doc.text(`Grand Horizon Hotel - ${title}`, 14, 16)
@@ -24,19 +31,18 @@ export async function exportPdf({ title, fileName, columns, rows }) {
 }
 
 export async function exportExcel({ title, fileName, columns, rows }) {
-  const { default: writeXlsxFile } = await import('write-excel-file/browser')
   const data = [
     [{ value: `Grand Horizon Hotel - ${title}`, fontWeight: 'bold' }],
     [{ value: `Generated ${stamp()}` }],
     [],
     columns.map((c) => ({ value: c.title, fontWeight: 'bold' })),
-    ...rows.map((r) => columns.map((c) => ({ value: String(c.value(r) ?? '') }))),
+    ...rows.map((r) => columns.map((c) => ({ value: spreadsheetText(c.value(r)) }))),
   ]
   await writeXlsxFile(data, { columns: columns.map(() => ({ width: 22 })) }).toFile(`${fileName}.xlsx`)
 }
 
 function csvCell(value) {
-  const text = String(value ?? '')
+  const text = spreadsheetText(value)
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 

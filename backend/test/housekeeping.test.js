@@ -26,6 +26,7 @@ const { assertConfig } = require('../src/config/env');
 
 let server;
 let base;
+const completeChecklist = { bed: true, bathroom: true, amenities: true, floors: true, fixtures: true };
 
 before(async () => {
   const shared = fs.readFileSync(path.join(__dirname, '../../database/standalone/00-shared-tables.sql'), 'utf8');
@@ -148,7 +149,7 @@ test('cleaning flow: create, assign, clean, fail inspection, re-clean, pass', as
   await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: joy.token });
   const passed = await api('POST', '/housekeeping/inspections', {
     token: insp.token,
-    body: { taskId, result: 'PASSED', checklist: { bed: true, bathroom: true } },
+    body: { taskId, result: 'PASSED', checklist: completeChecklist },
   });
   assert.equal(passed.status, 201);
   assert.equal(await roomStatus(room), 'INSPECTED');
@@ -165,33 +166,33 @@ test('cleaning flow: create, assign, clean, fail inspection, re-clean, pass', as
 
 test('room status: only allowed manual changes', async () => {
   const liza = await login('hk.liza');
+  const sup = await login('hk.supervisor');
   const occupied = await roomId('202');
   const bad = await api('PATCH', `/housekeeping/rooms/${occupied}/status`, {
     token: liza.token,
     body: { status: 'AVAILABLE' },
   });
-  assert.equal(bad.status, 409);
+  assert.equal(bad.status, 403);
   // Only Front Office's check-out makes an occupied room DIRTY.
   const guestInside = await api('PATCH', `/housekeeping/rooms/${occupied}/status`, {
     token: liza.token,
     body: { status: 'DIRTY', remarks: 'Guest asked for service' },
   });
-  assert.equal(guestInside.status, 409);
+  assert.equal(guestInside.status, 403);
   assert.equal(await roomStatus(occupied), 'OCCUPIED');
   const vacant = await roomId('101');
   const ok = await api('PATCH', `/housekeeping/rooms/${vacant}/status`, {
-    token: liza.token,
+    token: sup.token,
     body: { status: 'DIRTY', remarks: 'Spill found during walk-through' },
   });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.room.room_status, 'DIRTY');
 
   // INSPECTED comes only from an inspection, OUT_OF_ORDER only from a maintenance request.
-  const sup = await login('hk.supervisor');
   const clean = await roomId('205');
   for (const status of ['INSPECTED', 'OUT_OF_ORDER']) {
     const refused = await api('PATCH', `/housekeeping/rooms/${clean}/status`, { token: sup.token, body: { status } });
-    assert.equal(refused.status, 409, status);
+    assert.equal(refused.status, 400, status);
   }
   assert.equal(await roomStatus(clean), 'CLEAN');
   const detail = await api('GET', `/housekeeping/rooms/${clean}`, { token: sup.token });
@@ -200,6 +201,7 @@ test('room status: only allowed manual changes', async () => {
 
 test('lost and found: invalid claim is rejected, valid claim releases', async () => {
   const liza = await login('hk.liza');
+  const sup = await login('hk.supervisor');
   const created = await api('POST', '/housekeeping/lost-found', {
     token: liza.token,
     body: { roomId: await roomId('101'), description: 'Red scarf', foundLocation: 'Closet', storageLocation: 'Cabinet A' },
@@ -216,14 +218,14 @@ test('lost and found: invalid claim is rejected, valid claim releases', async ()
   const itemId = created.body.item.item_id;
 
   const rejected = await api('POST', `/housekeeping/lost-found/${itemId}/claims`, {
-    token: liza.token,
+    token: sup.token,
     body: { claimantName: 'Someone', claimantContact: '0917', idVerified: true, idType: 'NATIONAL_ID', idNumber: '1234-5678-9012', descriptionMatch: false },
   });
   assert.equal(rejected.body.released, false);
   assert.equal(rejected.body.item.item_status, 'STORED');
 
   const valid = await api('POST', `/housekeeping/lost-found/${itemId}/claims`, {
-    token: liza.token,
+    token: sup.token,
     body: { claimantName: 'Grace Lim', claimantContact: '0918', idVerified: true, idType: 'PASSPORT', idNumber: 'P1234567A', descriptionMatch: true },
   });
   assert.equal(valid.body.released, true);
@@ -239,7 +241,7 @@ test('lost and found: invalid claim is rejected, valid claim releases', async ()
   assert.equal(storedItems.body.items.some((item) => item.item_id === itemId), false);
 
   const again = await api('POST', `/housekeeping/lost-found/${itemId}/claims`, {
-    token: liza.token,
+    token: sup.token,
     body: { claimantName: 'X', claimantContact: 'Y', idVerified: true, idType: 'OTHER', idNumber: '9999', descriptionMatch: true },
   });
   assert.equal(again.status, 409);
@@ -266,25 +268,25 @@ test('guest request: record, assign, complete', async () => {
 });
 
 test('maintenance: report sets OUT OF ORDER, release creates cleaning task', async () => {
-  const mark = await login('hk.mark');
+  const sup = await login('hk.supervisor');
   const room = await roomId('101');
   // Start from a room with no open cleaning task.
   await db.query(`DELETE FROM hk_cleaning_tasks WHERE room_id = $1 AND task_status <> 'INSPECTED'`, [room]);
   const created = await api('POST', '/housekeeping/maintenance', {
-    token: mark.token,
+    token: sup.token,
     body: { roomId: room, category: 'PLUMBING', description: 'Leaking faucet', priority: 'HIGH', setOutOfOrder: true },
   });
   assert.equal(created.status, 201);
   assert.equal(await roomStatus(room), 'OUT_OF_ORDER');
   const id = created.body.request.request_id;
 
-  const early = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: mark.token });
+  const early = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: sup.token });
   assert.equal(early.status, 409);
 
   const eng = await loginAs('eng.tech', 'ENGINEERING');
   const repaired = await api('PATCH', `/housekeeping/maintenance/${id}/status`, { token: eng.token, body: { status: 'REPAIRED' } });
   assert.equal(repaired.status, 200);
-  const released = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: mark.token });
+  const released = await api('POST', `/housekeeping/maintenance/${id}/release`, { token: sup.token });
   assert.equal(released.status, 200);
   assert.equal(released.body.task.task_type, 'POST_REPAIR');
   assert.equal(await roomStatus(room), 'DIRTY');
@@ -334,7 +336,6 @@ test('login with email, alerts, activity and my schedule', async () => {
 
 test('out of order: open cleaning cannot finish, release reopens the task', async () => {
   const joy = await login('hk.joy');
-  const mark = await login('hk.mark');
   const sup = await login('hk.supervisor');
   const room = await roomId('103');
   const { rows } = await db.query(`SELECT task_id FROM hk_cleaning_tasks WHERE room_id = $1`, [room]);
@@ -342,7 +343,7 @@ test('out of order: open cleaning cannot finish, release reopens the task', asyn
 
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: joy.token })).status, 200);
   const report = await api('POST', '/housekeeping/maintenance', {
-    token: mark.token,
+    token: sup.token,
     body: { roomId: room, category: 'PLUMBING', description: 'Toilet leaking', setOutOfOrder: true },
   });
   assert.equal(report.status, 201);
@@ -360,7 +361,7 @@ test('out of order: open cleaning cannot finish, release reopens the task', asyn
     token: eng.token,
     body: { status: 'REPAIRED' },
   });
-  const released = await api('POST', `/housekeeping/maintenance/${report.body.request.request_id}/release`, { token: mark.token });
+  const released = await api('POST', `/housekeeping/maintenance/${report.body.request.request_id}/release`, { token: sup.token });
   assert.equal(released.status, 200);
   assert.equal(released.body.reopened, true);
   assert.equal(released.body.task.task_id, taskId);
@@ -376,9 +377,10 @@ test('out of order: open cleaning cannot finish, release reopens the task', asyn
 
 test('maintenance: occupied rooms are not set out of order', async () => {
   const liza = await login('hk.liza');
+  const sup = await login('hk.supervisor');
   const occupied = await roomId('301');
   const refused = await api('POST', '/housekeeping/maintenance', {
-    token: liza.token,
+    token: sup.token,
     body: { roomId: occupied, category: 'AIRCON', description: 'Noisy', setOutOfOrder: true },
   });
   assert.equal(refused.status, 409);
@@ -596,8 +598,7 @@ test('room status: a dirty room cannot be marked CLEAN by hand', async () => {
   const liza = await login('hk.liza');
   const room = await roomId('103');
   const res = await api('PATCH', `/housekeeping/rooms/${room}/status`, { token: liza.token, body: { status: 'CLEAN' } });
-  assert.equal(res.status, 409);
-  assert.match(res.body.error, /cleaning task/);
+  assert.equal(res.status, 403);
   assert.equal(await roomStatus(room), 'DIRTY');
   const detail = await api('GET', `/housekeeping/rooms/${room}`, { token: liza.token });
   assert.deepEqual(detail.body.allowedStatuses, []);
@@ -709,7 +710,7 @@ test('lost and found: only supervisors dispose, with a reason; photos', async ()
   assert.equal(disposed.body.item.disposed_by, sup.user.userId);
   assert.equal(disposed.body.item.disposal_reason, 'Unclaimed after 90 days, donated');
   // A claim must record which ID was checked.
-  const noId = await api('POST', `/housekeeping/lost-found/1/claims`, { token: liza.token, body: { claimantName: 'A', claimantContact: 'B', idVerified: true, descriptionMatch: true } });
+  const noId = await api('POST', `/housekeeping/lost-found/1/claims`, { token: sup.token, body: { claimantName: 'A', claimantContact: 'B', idVerified: true, descriptionMatch: true } });
   assert.equal(noId.status, 400);
 });
 
@@ -728,9 +729,9 @@ test('inspection: nobody inspects a room they cleaned themselves', async () => {
   await db.query(`UPDATE hk_cleaning_tasks SET staff_id = $1, task_status = 'ASSIGNED' WHERE task_id = $2`, [sup.user.userId, taskId]);
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: sup.token })).status, 200);
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: sup.token })).status, 200);
-  const self = await api('POST', '/housekeeping/inspections', { token: sup.token, body: { taskId, result: 'PASSED' } });
+  const self = await api('POST', '/housekeeping/inspections', { token: sup.token, body: { taskId, result: 'PASSED', checklist: completeChecklist } });
   assert.equal(self.status, 409);
-  const other = await api('POST', '/housekeeping/inspections', { token: inspector.token, body: { taskId, result: 'PASSED' } });
+  const other = await api('POST', '/housekeeping/inspections', { token: inspector.token, body: { taskId, result: 'PASSED', checklist: completeChecklist } });
   assert.equal(other.status, 201);
 });
 
@@ -957,7 +958,7 @@ test('stayover: cleaning an occupied room keeps it OCCUPIED and never offers it 
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: joy.token })).status, 200);
   assert.equal(await roomStatus(room), 'OCCUPIED');
   const before = await db.query('SELECT COUNT(*)::int AS n FROM hk_front_office_notifications WHERE room_id = $1', [room]);
-  const passed = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED' } });
+  const passed = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED', checklist: completeChecklist } });
   assert.equal(passed.status, 201, JSON.stringify(passed.body));
   assert.equal(await roomStatus(room), 'OCCUPIED');
   const after = await db.query('SELECT COUNT(*)::int AS n FROM hk_front_office_notifications WHERE room_id = $1', [room]);
@@ -980,7 +981,7 @@ test('inspection: a room marked DIRTY again goes back to the housekeeper', async
   assert.equal(marked.status, 200);
   const task = await api('GET', `/housekeeping/tasks/${waiting.task_id}`, { token: sup.token });
   assert.equal(task.body.task.task_status, 'RETURNED');
-  const inspect = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId: waiting.task_id, result: 'PASSED' } });
+  const inspect = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId: waiting.task_id, result: 'PASSED', checklist: completeChecklist } });
   assert.equal(inspect.status, 409);
   assert.equal(await roomStatus(waiting.room_id), 'DIRTY');
 });
@@ -1031,7 +1032,7 @@ test('checkout: a stayover waiting for inspection goes back to the housekeeper a
   // The room can now be cleaned again and inspected.
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/start`, { token: liza.token })).status, 200);
   assert.equal((await api('POST', `/housekeeping/tasks/${taskId}/complete`, { token: liza.token })).status, 200);
-  const pass = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED' } });
+  const pass = await api('POST', '/housekeeping/inspections', { token: ins.token, body: { taskId, result: 'PASSED', checklist: completeChecklist } });
   assert.equal(pass.status, 201, JSON.stringify(pass.body));
   assert.equal(await roomStatus(room), 'INSPECTED');
 });
@@ -1045,7 +1046,7 @@ test('front office: a ready room marked DIRTY again no longer shows as ready', a
   await db.query(`INSERT INTO hk_front_office_notifications (room_id, message) VALUES ($1, 'Room 203 passed inspection and is ready to be released as AVAILABLE.')`, [room]);
   const before = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.token });
   assert.ok(before.body.notifications.some((n) => n.room_id === room && n.notice_type === 'ROOM_READY'));
-  const dirty = await api('PATCH', `/housekeeping/rooms/${room}/status`, { token: sup.token, body: { status: 'DIRTY' } });
+  const dirty = await api('PATCH', `/housekeeping/rooms/${room}/status`, { token: sup.token, body: { status: 'DIRTY', remarks: 'New spill reported after inspection' } });
   assert.equal(dirty.status, 200);
   const after = await api('GET', '/housekeeping/notifications?unread=1', { token: fo.token });
   assert.ok(!after.body.notifications.some((n) => n.room_id === room && n.notice_type === 'ROOM_READY'));

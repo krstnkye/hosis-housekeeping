@@ -8,6 +8,17 @@ const { corsOrigins } = require('./config/env');
 
 const app = express();
 
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), payment=(), usb=()');
+  res.set('Cross-Origin-Opener-Policy', 'same-origin');
+  res.set('Cross-Origin-Resource-Policy', 'same-origin');
+  next();
+});
+
 // Only the HOSIS frontend may call the API from a browser (set CORS_ORIGIN).
 app.use(cors({ origin: corsOrigins() }));
 // 3 MB leaves room for one lost-and-found photo (2 MB) sent as base64.

@@ -3,6 +3,7 @@ const db = require('../../config/db');
 const HttpError = require('../../utils/httpError');
 const v = require('./validate');
 const { requirePosition } = require('../../middleware/auth');
+const { isSupportedImageData } = require('../../utils/imageUpload');
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ const ID_TYPES = ['PASSPORT', 'DRIVERS_LICENSE', 'NATIONAL_ID', 'UMID', 'SSS', '
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const MAX_PHOTOS = 3;
+const canManageAll = (user) => user.role === 'ADMIN' || user.position === 'SUPERVISOR';
 
 const ITEM_TEXT = {
   description: [255, 'Description'],
@@ -97,11 +99,11 @@ router.patch('/:id', async (req, res) => {
     `UPDATE hk_lost_found_items
         SET item_description = COALESCE($1, item_description),
             storage_location = COALESCE($2, storage_location)
-      WHERE item_id = $3 AND item_status = 'STORED' RETURNING *`,
-    [body.description || null, body.storageLocation || null, itemId]
+      WHERE item_id = $3 AND item_status = 'STORED' AND ($4 OR found_by = $5) RETURNING *`,
+    [body.description || null, body.storageLocation || null, itemId, canManageAll(req.user), req.user.userId]
   );
   if (!rows[0]) {
-    throw new HttpError(409, 'Item not found, or it was already released or disposed.');
+    throw new HttpError(409, 'Only the recording staff member or a supervisor can edit a stored item.');
   }
   res.json({ item: rows[0] });
 });
@@ -137,19 +139,22 @@ router.post('/:id/photos', async (req, res) => {
     throw new HttpError(400, 'Upload a JPEG, PNG or WebP photo.');
   }
   const data = Buffer.from(match[2], 'base64');
-  if (data.length > MAX_PHOTO_BYTES) {
-    throw new HttpError(400, 'Photos must be 2 MB or smaller.');
+  if (!data.length || data.length > MAX_PHOTO_BYTES || !isSupportedImageData(data, match[1])) {
+    throw new HttpError(400, 'Upload a valid JPEG, PNG or WebP photo no larger than 2 MB.');
   }
   const photo = await db.withTransaction(async (client) => {
     const { rows: items } = await client.query(
-      'SELECT item_status FROM hk_lost_found_items WHERE item_id = $1 FOR UPDATE',
+      'SELECT item_status, found_by FROM hk_lost_found_items WHERE item_id = $1 FOR UPDATE',
       [itemId]
     );
     if (!items[0]) {
       throw new HttpError(404, 'Item not found.');
     }
     if (items[0].item_status !== 'STORED') {
-      throw new HttpError(409, `This item is already ${items[0].item_status.toLowerCase()}, so its photos cannot be changed.`);
+      throw new HttpError(409, 'Photos cannot be added after an item is released or disposed.');
+    }
+    if (!canManageAll(req.user) && items[0].found_by !== req.user.userId) {
+      throw new HttpError(403, 'Only the recording staff member or a supervisor can add item photos.');
     }
     const { rows: count } = await client.query(
       'SELECT COUNT(*)::int AS n FROM hk_lost_found_photos WHERE item_id = $1',
@@ -189,8 +194,9 @@ router.delete('/:id/photos/:photoId', async (req, res) => {
   const photoId = v.id(req.params.photoId, 'photo id');
   const { rowCount } = await db.query(
     `DELETE FROM hk_lost_found_photos p USING hk_lost_found_items i
-      WHERE p.photo_id = $1 AND p.item_id = $2 AND i.item_id = p.item_id AND i.item_status = 'STORED'`,
-    [photoId, itemId]
+      WHERE p.photo_id = $1 AND p.item_id = $2 AND i.item_id = p.item_id AND i.item_status = 'STORED'
+        AND ($3 OR p.uploaded_by = $4)`,
+    [photoId, itemId, canManageAll(req.user), req.user.userId]
   );
   if (!rowCount) {
     throw new HttpError(404, 'Photo not found, or the item is no longer stored.');
@@ -200,7 +206,7 @@ router.delete('/:id/photos/:photoId', async (req, res) => {
 
 // HK-012: process a claim. The item is released only when the claimant's ID
 // is verified and the description matches; otherwise the claim is rejected.
-router.post('/:id/claims', async (req, res) => {
+router.post('/:id/claims', requirePosition('SUPERVISOR'), async (req, res) => {
   const itemId = v.id(req.params.id, 'item id');
   const body = req.body;
   v.required(body, ['claimantName', 'claimantContact']);
