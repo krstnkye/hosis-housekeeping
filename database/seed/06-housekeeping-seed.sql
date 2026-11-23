@@ -34,7 +34,7 @@ RESTART IDENTITY;
 INSERT INTO users (first_name, last_name, username, email, password_hash, role, position) VALUES
     ('Maria', 'Santos',    'hk.supervisor', 'maria.santos@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'SUPERVISOR'),
     ('Ana',   'Reyes',     'hk.inspector',  'ana.reyes@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'INSPECTOR'),
-    ('Demo',  'Housekeeper','hk.housekeeper','hk.housekeeper@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
+    ('Ana',   'Cruz',       'hk.housekeeper','ana.cruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Liza',  'Cruz',      'hk.liza',       'liza.cruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
