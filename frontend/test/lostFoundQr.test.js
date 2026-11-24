@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import QRCode from 'qrcode'
-import { buildLostFoundQrPayload } from '../src/modules/housekeeping/lostFoundQr.js'
+import { buildLostFoundQrPayload, resolveLostFoundPublicOrigin } from '../src/modules/housekeeping/lostFoundQr.js'
 
 const watch = {
   item_id: 17,
@@ -40,4 +40,20 @@ test('the permanent payload generates a real PNG QR image', async () => {
   const dataUrl = await QRCode.toDataURL(buildLostFoundQrPayload(watch, 'https://hosis.example'), { errorCorrectionLevel: 'Q', margin: 2, width: 360 })
   assert.match(dataUrl, /^data:image\/png;base64,/)
   assert.ok(Buffer.from(dataUrl.split(',')[1], 'base64').length > 1000)
+})
+
+test('loopback browser address becomes a phone-reachable LAN address and keeps the active port', () => {
+  assert.equal(resolveLostFoundPublicOrigin({
+    currentOrigin: 'http://127.0.0.1:5174',
+    configured: 'http://192.168.1.25:5173',
+    lanHost: '192.168.100.116',
+  }), 'http://192.168.100.116:5174')
+})
+
+test('an HTTPS deployment remains the permanent public QR origin', () => {
+  assert.equal(resolveLostFoundPublicOrigin({
+    currentOrigin: 'http://127.0.0.1:5174',
+    configured: 'https://hotel.example.com',
+    lanHost: '192.168.100.116',
+  }), 'https://hotel.example.com')
 })
