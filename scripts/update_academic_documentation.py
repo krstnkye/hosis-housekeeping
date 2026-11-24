@@ -367,7 +367,7 @@ def add_revision_chapter(doc, finance_diagram: Path, leave_diagram: Path):
     doc.add_heading("Security and Inter-Subsystem Integration Revision", level=1)
     add_body(
         doc,
-        "This revision incorporates the first-defense comments and the additional operational requirements identified on November 23, 2026. It documents only behavior implemented in the Housekeeping source code and verified against the integrated HOSIS database. The design preserves department ownership: Housekeeping records evidence, Front Office verifies the stay context, Finance decides guest charges, Human Resources decides leave, and Engineering controls repair progress.",
+        "This revision incorporates the first-defense comments and the operational requirements verified through November 24, 2026. It documents behavior implemented in the Housekeeping source code and tested against the integrated HOSIS database. The design preserves department ownership: Housekeeping records evidence, Front Office verifies the stay context, Finance decides guest charges, Human Resources decides leave, and Engineering controls repair progress.",
     )
 
     doc.add_heading("Implemented Integration Responsibilities", level=2)
@@ -414,18 +414,18 @@ def add_revision_chapter(doc, finance_diagram: Path, leave_diagram: Path):
         doc,
         ["Role", "Method and endpoint", "Purpose and protection"],
         [
-            ["Housekeeping", "GET /api/housekeeping/charge-findings", "Read charge findings created within the Housekeeping workflow."],
-            ["Housekeeping", "POST /api/housekeeping/charge-findings", "Create a validated finding; duplicate open findings for the same event are refused."],
-            ["Housekeeping", "PATCH /api/housekeeping/charge-findings/:id/withdraw", "Withdraw only a finding that has not reached a department decision."],
-            ["Front Office", "GET /api/housekeeping/integrations/front-office/charge-findings", "Read the Front Office review queue."],
-            ["Front Office", "PATCH /api/housekeeping/integrations/front-office/charge-findings/:id", "Forward to Finance or reject with required notes."],
-            ["Finance", "GET /api/housekeeping/integrations/finance/charge-findings", "Read only findings that passed Front Office review."],
-            ["Finance", "PATCH /api/housekeeping/integrations/finance/charge-findings/:id", "Approve with a valid amount or reject; a second decision is refused."],
-            ["Housekeeping", "GET /api/housekeeping/leave-requests", "Read the signed-in employee's leave requests only."],
-            ["Housekeeping", "POST /api/housekeeping/leave-requests", "Submit a validated, non-overlapping leave request."],
-            ["Housekeeping", "PATCH /api/housekeeping/leave-requests/:id/withdraw", "Withdraw the signed-in employee's pending request."],
-            ["Human Resources", "GET /api/housekeeping/integrations/hr/leave-requests", "Read the Housekeeping leave queue."],
-            ["Human Resources", "PATCH /api/housekeeping/integrations/hr/leave-requests/:id", "Approve or reject with reviewer identity and notes."],
+            ["Housekeeping", "GET /api/v1/housekeeping/charge-findings", "Read charge findings created within the Housekeeping workflow."],
+            ["Housekeeping", "POST /api/v1/housekeeping/charge-findings", "Create a validated finding; duplicate open findings for the same event are refused."],
+            ["Housekeeping", "PATCH /api/v1/housekeeping/charge-findings/:id/withdraw", "Withdraw only a finding that has not reached a department decision."],
+            ["Front Office", "GET /api/v1/housekeeping/integrations/front-office/charge-findings", "Read the Front Office review queue."],
+            ["Front Office", "PATCH /api/v1/housekeeping/integrations/front-office/charge-findings/:id", "Forward to Finance or reject with required notes."],
+            ["Finance", "GET /api/v1/housekeeping/integrations/finance/charge-findings", "Read only findings that passed Front Office review."],
+            ["Finance", "PATCH /api/v1/housekeeping/integrations/finance/charge-findings/:id", "Approve with a valid amount or reject; a second decision is refused."],
+            ["Housekeeping", "GET /api/v1/housekeeping/leave-requests", "Read the signed-in employee's leave requests only."],
+            ["Housekeeping", "POST /api/v1/housekeeping/leave-requests", "Submit a validated, non-overlapping leave request."],
+            ["Housekeeping", "PATCH /api/v1/housekeeping/leave-requests/:id/withdraw", "Withdraw the signed-in employee's pending request."],
+            ["Human Resources", "GET /api/v1/housekeeping/integrations/hr/leave-requests", "Read the Housekeeping leave queue."],
+            ["Human Resources", "PATCH /api/v1/housekeeping/integrations/hr/leave-requests/:id", "Approve or reject with reviewer identity and notes."],
         ],
     )
 
@@ -439,8 +439,8 @@ def add_revision_chapter(doc, finance_diagram: Path, leave_diagram: Path):
         ["Entity", "Key fields", "Purpose and integrity rules"],
         [
             ["HK_CHARGE_FINDINGS", "finding_id (PK), room_id (FK), reported_by (FK), finance_invoice_id (unique FK)", "Stores the evidence, status, estimates, final amount, reviewers, timestamps, and optimistic version. Status is restricted to REPORTED, FOR_FINANCE, APPROVED, REJECTED, or WITHDRAWN."],
-            ["HK_CHARGE_FINDING_EVENTS", "event_id (PK), finding_id (FK), actor_user_id (FK)", "Append-only transition history containing the action, originating department, notes, and event time."],
-            ["HR_LEAVE_REQUESTS", "leave_request_id (PK), employee_id (FK), decided_by (FK)", "Stores leave type, inclusive date range, reason, status, submission and decision metadata, and version."],
+            ["HK_CHARGE_FINDING_EVENTS", "event_id (PK), finding_id (FK), actor_id (FK)", "Append-only transition history containing the action, originating department, notes, and event time."],
+            ["HR_LEAVE_REQUESTS", "id (PK), emp (FK), decided_by (FK)", "Stores leave type, inclusive date range, reason, status, submission and decision metadata, and version."],
         ],
     )
 
@@ -477,13 +477,13 @@ def add_revision_chapter(doc, finance_diagram: Path, leave_diagram: Path):
     doc.add_heading("Verification Results", level=2)
     add_table(
         doc,
-        ["Verification activity", "Result on November 23, 2026"],
+        ["Verification activity", "Result on November 24, 2026"],
         [
             ["Standalone backend regression suite", "51 of 51 tests passed, including Finance/Front Office ownership, leave privacy, overlap checks, and image validation."],
-            ["Integrated backend unit suite", "19 tests passed; two database-dependent suites remain explicitly separated from the unit run."],
-            ["Integrated PostgreSQL workflow check", "Finding creation, Front Office forward, Finance approval/invoice creation, leave submission, HR approval, and employee decision retrieval completed successfully."],
+            ["Integrated backend and PostgreSQL suite", "48 of 48 tests passed, including the complete Housekeeping to Front Office to Finance charge workflow, one-invoice enforcement, RBAC, room status, maintenance, HR leave, concurrency, and session security."],
+            ["Integrated charge workflow check", "Housekeeping finding creation, Front Office reservation validation, Finance approval, and exactly one invoice-line creation completed successfully; repeated review and approval attempts were rejected."],
             ["Frontend production builds", "Integrated and standalone Vite builds completed successfully after the new pages and views were added."],
-            ["Database migration", "The additive workflow migration applied without replacing existing Front Office, Finance, HR, or Housekeeping records."],
+            ["Database migration and local deployment", "All migrations through 26-housekeeping-finance-hr-workflows.sql applied to PostgreSQL 17. The API and integrated frontend returned HTTP 200 while the existing 12-room operational dataset remained intact."],
         ],
     )
     add_body(
@@ -519,7 +519,11 @@ def add_revision_chapter(doc, finance_diagram: Path, leave_diagram: Path):
         start=1,
     ):
         paragraph = doc.add_paragraph(style="Normal")
-        paragraph.add_run(f"{number}. {text}")
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(1)
+        paragraph.paragraph_format.line_spacing = 0.92
+        run = paragraph.add_run(f"{number}. {text}")
+        run.font.size = Pt(9)
 
 
 def create_title_page(output_path: Path):
@@ -588,7 +592,7 @@ def main():
     args = parser.parse_args()
     output_dir = args.output_dir.resolve()
     title_path = output_dir / "HOSIS_Housekeeping_Corrected_Title_Page_2026.docx"
-    document_path = output_dir / "HOSIS_Housekeeping_Subsystem_Updated_Documentation_2026.docx"
+    document_path = output_dir / "HOSIS_Housekeeping_Subsystem_Final_Documentation_2026.docx"
     create_title_page(title_path)
     update_document(args.source.resolve(), document_path, output_dir / "assets")
     print(title_path)

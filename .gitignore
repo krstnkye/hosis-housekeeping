@@ -9,3 +9,6 @@ build/
 .codex-finalizer/
 output/
 tmp/
+
+# Microsoft Word owner/lock files created while a document is open
+~$*.docx
