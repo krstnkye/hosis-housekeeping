@@ -23,6 +23,7 @@ export const TAB_POSITIONS = {
 // Extra pages in the housekeeping staff menu (Staff Dashboard).
 export const STAFF_TABS = [
   { id: 'report', name: 'Report Room', icon: 'M5 21V4h11l-1.5 4L16 12H5M9 8h2' },
+  { id: 'leave', name: 'Leave Requests', icon: 'M5 4h14v17H5zM8 2v4M16 2v4M5 9h14M8 13h3M8 17h5' },
   { id: 'record', name: 'Staff Reports', icon: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6' },
   { id: 'account', name: 'Account', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
 ]

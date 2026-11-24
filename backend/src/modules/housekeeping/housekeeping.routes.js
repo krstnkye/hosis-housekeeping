@@ -43,6 +43,7 @@ router.use(requirePasswordChanged);
 router.use(require('./frontOffice.routes'));
 router.use('/maintenance', require('./engineering.routes'));
 router.use(require('./integrationReports.routes'));
+router.use(require('./workflows.routes'));
 
 // Everything else is for HOUSEKEEPING (or ADMIN) users only.
 router.use(authorize('HOUSEKEEPING'));

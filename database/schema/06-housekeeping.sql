@@ -286,6 +286,63 @@ ALTER TABLE hk_guest_requests ADD COLUMN IF NOT EXISTS stock_approved_at  TIMEST
 CREATE INDEX IF NOT EXISTS idx_hk_inv_moves_item  ON hk_inventory_movements (inv_item_id);
 CREATE INDEX IF NOT EXISTS idx_hk_logs_changed    ON hk_room_status_logs (changed_at);
 
+-- Cross-department findings and leave requests for the standalone build.
+-- The integrated HOSIS build links these records to its canonical Reservation,
+-- Finance and HR tables; standalone keeps the same protected workflow locally.
+CREATE TABLE IF NOT EXISTS hk_charge_findings (
+    finding_id SERIAL PRIMARY KEY,
+    public_reference VARCHAR(30) NOT NULL UNIQUE DEFAULT
+      ('HKF-' || UPPER(SUBSTRING(md5(random()::text || clock_timestamp()::text), 1, 12))),
+    room_id INT NOT NULL REFERENCES rooms(room_id),
+    reservation_reference VARCHAR(100),
+    category VARCHAR(30) NOT NULL CHECK (category IN
+      ('DAMAGE','MISSING_ITEM','LINEN_LOSS','SMOKING','EXCESSIVE_CLEANING','OTHER')),
+    description VARCHAR(500) NOT NULL,
+    estimated_amount NUMERIC(12,2) CHECK (estimated_amount IS NULL OR estimated_amount >= 0),
+    status VARCHAR(30) NOT NULL DEFAULT 'REPORTED' CHECK (status IN
+      ('REPORTED','FOR_FINANCE','APPROVED','REJECTED','WITHDRAWN')),
+    reported_by INT NOT NULL REFERENCES users(user_id),
+    reported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    front_office_reviewed_by INT REFERENCES users(user_id),
+    front_office_reviewed_at TIMESTAMPTZ,
+    front_office_notes VARCHAR(500),
+    finance_decided_by INT REFERENCES users(user_id),
+    finance_decided_at TIMESTAMPTZ,
+    final_amount NUMERIC(12,2) CHECK (final_amount IS NULL OR final_amount >= 0),
+    finance_notes VARCHAR(500),
+    version INT NOT NULL DEFAULT 1 CHECK (version > 0)
+);
+
+CREATE TABLE IF NOT EXISTS hk_charge_finding_events (
+    event_id SERIAL PRIMARY KEY,
+    finding_id INT NOT NULL REFERENCES hk_charge_findings(finding_id) ON DELETE CASCADE,
+    from_status VARCHAR(30), to_status VARCHAR(30) NOT NULL,
+    action VARCHAR(40) NOT NULL, notes VARCHAR(500),
+    actor_id INT REFERENCES users(user_id), actor_role VARCHAR(30) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS hk_leave_requests (
+    leave_id SERIAL PRIMARY KEY,
+    public_reference VARCHAR(40) NOT NULL UNIQUE DEFAULT
+      ('LR-HK-' || UPPER(SUBSTRING(md5(random()::text || clock_timestamp()::text), 1, 12))),
+    staff_id INT NOT NULL REFERENCES users(user_id),
+    leave_type VARCHAR(30) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL CHECK (end_date >= start_date),
+    days INT NOT NULL CHECK (days BETWEEN 1 AND 60),
+    reason VARCHAR(500) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED','REJECTED','WITHDRAWN')),
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_at TIMESTAMPTZ,
+    decided_by INT REFERENCES users(user_id),
+    decision_notes VARCHAR(500),
+    version INT NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_hk_charge_findings_status ON hk_charge_findings(status, reported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hk_leave_requests_staff ON hk_leave_requests(staff_id, submitted_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_status   ON hk_cleaning_tasks (task_status);
 CREATE INDEX IF NOT EXISTS idx_hk_tasks_staff    ON hk_cleaning_tasks (staff_id);
 CREATE INDEX IF NOT EXISTS idx_hk_logs_room      ON hk_room_status_logs (room_id);

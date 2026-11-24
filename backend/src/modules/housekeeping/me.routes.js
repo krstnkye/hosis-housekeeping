@@ -27,7 +27,8 @@ async function staffRecord(userId, includeEmail = false) {
          (SELECT COUNT(*) FROM hk_guest_requests WHERE staff_id = $1 AND request_status = 'COMPLETED')::int AS requests_completed,
          (SELECT COUNT(*) FROM hk_lost_found_items WHERE found_by = $1)::int AS items_found,
          (SELECT COUNT(*) FROM hk_maintenance_requests WHERE reported_by = $1)::int AS issues_reported,
-         (SELECT COUNT(*) FROM hk_front_office_notifications WHERE created_by = $1 AND notice_type = 'ROOM_CONDITION')::int AS conditions_reported,
+         ((SELECT COUNT(*) FROM hk_charge_findings WHERE reported_by = $1 AND status <> 'WITHDRAWN') +
+          (SELECT COUNT(*) FROM hk_front_office_notifications WHERE created_by=$1 AND notice_type='ROOM_CONDITION' AND message NOT LIKE 'Charge finding %'))::int AS conditions_reported,
          (SELECT COUNT(*) FROM hk_schedules WHERE staff_id = $1 AND shift_date <= CURRENT_DATE)::int AS shifts_worked`,
       [userId]
     ),
@@ -66,9 +67,13 @@ async function staffRecord(userId, includeEmail = false) {
          SELECT 'MAINTENANCE', CONCAT('Reported ', LOWER(m.issue_category), ' issue in Room ', r.room_number), m.reported_at
            FROM hk_maintenance_requests m JOIN rooms r ON r.room_id = m.room_id WHERE m.reported_by = $1
          UNION ALL
+         SELECT 'ROOM_CONDITION', CONCAT('Reported Room ', r.room_number, ' finding ', f.public_reference, ' to Front Office'), f.reported_at
+           FROM hk_charge_findings f JOIN rooms r ON r.room_id = f.room_id
+          WHERE f.reported_by = $1 AND f.status <> 'WITHDRAWN'
+         UNION ALL
          SELECT 'ROOM_CONDITION', CONCAT('Reported Room ', r.room_number, ' condition to Front Office'), n.created_at
-           FROM hk_front_office_notifications n JOIN rooms r ON r.room_id = n.room_id
-          WHERE n.created_by = $1 AND n.notice_type = 'ROOM_CONDITION'
+           FROM hk_front_office_notifications n JOIN rooms r ON r.room_id=n.room_id
+          WHERE n.created_by=$1 AND n.notice_type='ROOM_CONDITION' AND n.message NOT LIKE 'Charge finding %'
        ) a ORDER BY at DESC LIMIT 15`,
       [userId]
     ),
@@ -106,12 +111,19 @@ router.get('/staff-records/:userId', async (req, res) => {
 router.get('/me/reports', async (req, res) => {
   const { rows } = await db.query(
     `SELECT * FROM (
-       SELECT 'FRONT_OFFICE' AS sent_to, n.notification_id AS id, r.room_number, n.message AS details,
-              CASE WHEN n.read_at IS NULL THEN 'SENT' ELSE 'SEEN' END AS status, n.created_at AS reported_at
-         FROM hk_front_office_notifications n JOIN rooms r ON r.room_id = n.room_id
-        WHERE n.created_by = $1 AND n.notice_type = 'ROOM_CONDITION'
+       SELECT 'FRONT_OFFICE' AS sent_to, CONCAT('FINDING-', f.finding_id) AS id, r.room_number,
+              CONCAT(REPLACE(f.category, '_', ' '), ': ', f.description,
+                CASE WHEN f.final_amount IS NULL THEN '' ELSE CONCAT(' - final charge PHP ', f.final_amount) END) AS details,
+              f.status, f.reported_at
+         FROM hk_charge_findings f JOIN rooms r ON r.room_id = f.room_id
+        WHERE f.reported_by = $1
        UNION ALL
-       SELECT 'MAINTENANCE', m.request_id, r.room_number, m.issue_description, m.status, m.reported_at
+       SELECT 'FRONT_OFFICE', CONCAT('NOTICE-', n.notification_id), r.room_number, n.message,
+              CASE WHEN n.read_at IS NULL THEN 'REPORTED' ELSE 'SEEN' END, n.created_at
+         FROM hk_front_office_notifications n JOIN rooms r ON r.room_id=n.room_id
+        WHERE n.created_by=$1 AND n.notice_type='ROOM_CONDITION' AND n.message NOT LIKE 'Charge finding %'
+       UNION ALL
+       SELECT 'MAINTENANCE', CONCAT('MAINT-', m.request_id), r.room_number, m.issue_description, m.status, m.reported_at
          FROM hk_maintenance_requests m JOIN rooms r ON r.room_id = m.room_id
         WHERE m.reported_by = $1
      ) a ORDER BY reported_at DESC LIMIT 20`,

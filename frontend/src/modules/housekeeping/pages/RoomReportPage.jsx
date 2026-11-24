@@ -17,6 +17,10 @@ const CONDITION_LABELS = {
   EXCESSIVE_MESS: 'Excessive mess',
   OTHER: 'Other',
 }
+const CHARGE_CATEGORY = {
+  DAMAGED: 'DAMAGE', MISSING_ITEMS: 'MISSING_ITEM', STAINS_ODOR: 'EXCESSIVE_CLEANING',
+  SMOKING: 'SMOKING', PEST: 'OTHER', SAFETY_HAZARD: 'DAMAGE', EXCESSIVE_MESS: 'EXCESSIVE_CLEANING', OTHER: 'OTHER',
+}
 // Maintenance categories (same as the Maintenance page).
 const CATEGORIES = ['PLUMBING', 'ELECTRICAL', 'AIRCON', 'FURNITURE', 'APPLIANCE', 'OTHER']
 const FRONT_OFFICE_HELD = ['OCCUPIED', 'RESERVED']
@@ -25,6 +29,7 @@ const EMPTY = {
   roomId: '',
   condition: 'DAMAGED',
   details: '',
+  estimatedAmount: '',
   priority: 'NORMAL',
   toFrontOffice: true,
   toMaintenance: false,
@@ -57,7 +62,8 @@ export default function RoomReportPage() {
     try {
       const details = form.details.trim()
       if (form.toFrontOffice) {
-        await api.reportCondition({ roomId: form.roomId, condition: form.condition, details })
+        await api.reportCondition({ roomId: form.roomId, category: CHARGE_CATEGORY[form.condition],
+          description: `${CONDITION_LABELS[form.condition]}: ${details}`, estimatedAmount: form.estimatedAmount || undefined })
         sent.push('Front Office')
       }
       if (form.toMaintenance) {
@@ -108,8 +114,9 @@ export default function RoomReportPage() {
               </select>
             </Field>
             <Field label="What did you find?" wide>
-              <textarea rows={3} maxLength={200} value={form.details} onChange={set('details')} placeholder="e.g. Broken lamp by the bed, bathroom towel rack loose" />
+              <textarea rows={3} maxLength={450} value={form.details} onChange={set('details')} placeholder="e.g. Broken lamp by the bed, bathroom towel rack loose" />
             </Field>
+            {form.toFrontOffice && <Field label="Estimated replacement or cleaning cost (optional)"><input type="number" min="0" step="0.01" max="9999999.99" value={form.estimatedAmount} onChange={set('estimatedAmount')} placeholder="0.00" /></Field>}
           </div>
 
           <fieldset className="hk-send-to">
@@ -118,7 +125,7 @@ export default function RoomReportPage() {
               <input type="checkbox" checked={form.toFrontOffice} onChange={set('toFrontOffice')} />
               <span>
                 <strong>Front Office</strong>
-                <small>For guest charges, room moves, or holding the room from sale</small>
+                <small>Front Office verifies the stay, then Finance decides any final guest charge</small>
               </span>
             </label>
             <label className="hk-check hk-check--block">
@@ -182,7 +189,7 @@ export default function RoomReportPage() {
                     <small>{formatDateTime(r.reported_at)}</small>
                   </div>
                   <div className="hk-staff-list__side">
-                    <Badge value={r.status === 'SEEN' ? 'COMPLETED' : r.status === 'SENT' ? 'OPEN' : r.status}>{label(r.status)}</Badge>
+                    <Badge value={r.status === 'REPORTED' ? 'OPEN' : r.status}>{label(r.status)}</Badge>
                   </div>
                 </li>
               ))}

@@ -23,6 +23,16 @@ app.use((req, res, next) => {
 app.use(cors({ origin: corsOrigins() }));
 // 3 MB leaves room for one lost-and-found photo (2 MB) sent as base64.
 app.use(express.json({ limit: '3mb' }));
+// Mutation endpoints accept named fields only. Reject arrays, strings and
+// other JSON roots before they can reach route-level validation.
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  if (req.body === undefined) req.body = {};
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Request body must be a JSON object.' });
+  }
+  return next();
+});
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

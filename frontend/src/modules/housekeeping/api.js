@@ -168,5 +168,10 @@ export const api = {
   myRecord: () => request('GET', `${HK}/me/record`),
   staffRecord: (userId) => request('GET', `${HK}/staff-records/${userId}`),
   myReports: () => request('GET', `${HK}/me/reports`),
-  reportCondition: (body) => request('POST', `${HK}/room-reports`, body),
+  chargeFindings: (scope = 'all') => request('GET', `${HK}/charge-findings?scope=${encodeURIComponent(scope)}`),
+  reportCondition: (body) => request('POST', `${HK}/charge-findings`, body),
+  withdrawFinding: (id, notes) => request('PATCH', `${HK}/charge-findings/${id}/withdraw`, { notes }),
+  leaveRequests: () => request('GET', `${HK}/leave-requests`),
+  createLeaveRequest: (body) => request('POST', `${HK}/leave-requests`, body),
+  withdrawLeaveRequest: (id) => request('PATCH', `${HK}/leave-requests/${encodeURIComponent(id)}/withdraw`, {}),
 }

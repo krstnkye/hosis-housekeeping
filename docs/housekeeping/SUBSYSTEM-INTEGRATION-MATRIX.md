@@ -10,7 +10,9 @@ Ito ang hinihingi ng project leader: pangalan ng subsystem, aling subsystem ang 
 | Housekeeping | Front Office | Room-ready and room-condition notification | Room, notice type, message, creation/read time | `GET /api/housekeeping/notifications`, `PATCH /api/housekeeping/notifications/:id/read` |
 | Housekeeping | Engineering & Maintenance | Housekeeping reports defects; Engineering updates repair progress | Room, issue, priority, OUT_OF_ORDER flag, repair status | `GET /api/housekeeping/maintenance/incoming`, `PATCH /api/housekeeping/maintenance/:id/status` |
 | Housekeeping | Human Resources | HR receives staff workload/performance totals | Staff ID/name/position, completed cleaning, inspections, completed requests, scheduled shifts | `GET /api/housekeeping/integrations/hr/staff-summary?from=YYYY-MM-DD&to=YYYY-MM-DD` |
+| Housekeeping | Human Resources | Staff leave submission and protected HR decision | Employee, leave type, inclusive dates, reason, decision notes and reviewer | `GET/POST /api/housekeeping/leave-requests`; `GET/PATCH /api/housekeeping/integrations/hr/leave-requests` |
 | Housekeeping | Finance & Accounting | Finance receives supply/linen usage and reorder information | Item, category, unit, current balance, quantity in/used/adjusted, reorder flag | `GET /api/housekeeping/integrations/finance/inventory-usage?from=YYYY-MM-DD&to=YYYY-MM-DD` |
+| Housekeeping | Front Office → Finance & Accounting | Damage, missing-linen, deep-cleaning, smoking or other applicable guest-fee finding | Room, reservation reference, evidence, observed date, estimate, review history, final amount | `GET/POST /api/housekeeping/charge-findings`; `GET/PATCH /api/housekeeping/integrations/front-office/charge-findings`; `GET/PATCH /api/housekeeping/integrations/finance/charge-findings` |
 | Housekeeping | HOSIS shared authentication | Shared account and role access | User ID, role, position, employment status | Shared `/api/auth`; Housekeeping re-checks the shared `users` table |
 | Housekeeping | Public guest-facing HOSIS page | Permanent Lost & Found QR verification | Reference, item description, found location/date, current status only | `GET /api/public/lost-found/:publicCode` |
 
@@ -37,7 +39,9 @@ The shared `ExportMenu` now includes CSV, so every Housekeeping page already usi
 - Front Office endpoints require a `FRONT_OFFICE` or `ADMIN` account.
 - Engineering endpoints require an `ENGINEERING` or `ADMIN` account.
 - HR summary requires an `HR` or `ADMIN` account.
+- Leave decisions require an `HR` or `ADMIN` account; Housekeeping staff can read only their own requests.
 - Finance inventory usage requires a `FINANCE` or `ADMIN` account.
+- Charge findings follow a strict Housekeeping → Front Office → Finance state transition; Finance alone sets a final amount.
 - Housekeeping Reports & Audit requires a Housekeeping supervisor or `ADMIN`.
 - The public QR endpoint requires no login but deliberately excludes personal and internal custody data.
 

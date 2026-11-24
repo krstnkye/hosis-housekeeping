@@ -1211,3 +1211,66 @@ test('HR and Finance receive only their Housekeeping integration reports', async
   assert.equal((await api('GET', `/housekeeping/integrations/finance/inventory-usage?from=${from}&to=${to}`, { token: hr.token })).status, 403);
   assert.equal((await api('GET', `/housekeeping/integrations/hr/staff-summary?from=${from}&to=${to}`, { token: finance.token })).status, 403);
 });
+
+test('charge findings enforce Housekeeping, Front Office and Finance ownership', async () => {
+  const hk = await login('hk.liza');
+  const other = await login('hk.joy');
+  const fo = await loginAs('fo.desk', 'FRONT_OFFICE');
+  const finance = await loginAs('finance.officer', 'FINANCE');
+  const room = await roomId('102');
+
+  const created = await api('POST', '/housekeeping/charge-findings', {
+    token: hk.token,
+    body: { roomId: room, category: 'DAMAGE', description: 'Cracked bedside lamp base', estimatedAmount: '850.00' },
+  });
+  assert.equal(created.status, 201);
+  const id = created.body.finding.finding_id;
+  assert.equal((await api('GET', '/housekeeping/integrations/finance/charge-findings', { token: hk.token })).status, 403);
+  assert.equal((await api('PATCH', `/housekeeping/charge-findings/${id}/withdraw`, { token: other.token, body: { notes: 'Not mine' } })).status, 403);
+
+  const forwarded = await api('PATCH', `/housekeeping/integrations/front-office/charge-findings/${id}`, {
+    token: fo.token,
+    body: { decision: 'FORWARD', reservationReference: 'RES-2026-102', notes: 'Verified with the checked-in stay.' },
+  });
+  assert.equal(forwarded.status, 200);
+  assert.equal(forwarded.body.finding.status, 'FOR_FINANCE');
+  assert.equal((await api('PATCH', `/housekeeping/integrations/front-office/charge-findings/${id}`, {
+    token: fo.token, body: { decision: 'REJECT', notes: 'Second decision' },
+  })).status, 409);
+
+  const decided = await api('PATCH', `/housekeeping/integrations/finance/charge-findings/${id}`, {
+    token: finance.token,
+    body: { decision: 'APPROVE', amount: '800.00', notes: 'Replacement charge approved.' },
+  });
+  assert.equal(decided.status, 200);
+  assert.equal(decided.body.finding.status, 'APPROVED');
+  assert.equal(decided.body.finding.final_amount, '800.00');
+  assert.equal((await api('PATCH', `/housekeeping/integrations/finance/charge-findings/${id}`, {
+    token: finance.token, body: { decision: 'APPROVE', amount: '800.00', notes: 'Duplicate' },
+  })).status, 409);
+});
+
+test('leave requests are private, non-overlapping and decided only by HR', async () => {
+  const hk = await login('hk.liza');
+  const other = await login('hk.joy');
+  const hr = await loginAs('hr.officer', 'HR');
+  const start = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+  const created = await api('POST', '/housekeeping/leave-requests', {
+    token: hk.token,
+    body: { type: 'VACATION', startDate: start, endDate: start, reason: 'Scheduled personal appointment' },
+  });
+  assert.equal(created.status, 201);
+  const leaveId = created.body.request.leave_id;
+  assert.equal((await api('POST', '/housekeeping/leave-requests', {
+    token: hk.token,
+    body: { type: 'VACATION', startDate: start, endDate: start, reason: 'Overlapping request' },
+  })).status, 409);
+  assert.equal((await api('PATCH', `/housekeeping/leave-requests/${leaveId}/withdraw`, { token: other.token, body: {} })).status, 409);
+  assert.equal((await api('GET', '/housekeeping/integrations/hr/leave-requests', { token: hk.token })).status, 403);
+  const decision = await api('PATCH', `/housekeeping/integrations/hr/leave-requests/${leaveId}`, {
+    token: hr.token, body: { decision: 'APPROVE', notes: 'Coverage confirmed.' },
+  });
+  assert.equal(decision.status, 200);
+  const own = await api('GET', '/housekeeping/leave-requests', { token: hk.token });
+  assert.equal(own.body.requests.find((row) => row.id === leaveId).status, 'APPROVED');
+});

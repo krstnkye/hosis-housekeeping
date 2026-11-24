@@ -17,9 +17,10 @@ users, rooms, and guests.
 | Shared application shell | Supported through `<HousekeepingApp session={{ token, user }} onLogout={logout} />` |
 | Shared authentication | Compatible with the shared JWT when it contains `userId`, `role`, and `position` and uses the same `JWT_SECRET` |
 | Shared users, rooms, and guests | Implemented through foreign keys and read-only lookups; Housekeeping does not duplicate these master tables |
-| Front Office room turnover | Implemented: checkout, room-ready/condition notifications, booking-linked guest requests, reservation-reference tracking, and demo-only release/check-in stand-ins |
+| Front Office room turnover | Implemented: checkout, room-ready/condition notifications, booking-linked guest requests, reservation-reference tracking, and protected release/check-in verification utilities |
 | Engineering maintenance | Implemented: incoming request queue and protected `IN_PROGRESS`/`REPAIRED` updates |
-| HR/staff master data | Uses the shared `users` record; the combined project should keep HR/ADMIN as the owner of employment status and organization-wide roles |
+| HR/staff master data | Implemented: shared staff identity plus private Housekeeping leave submission and HR-only approve/reject decisions |
+| Finance guest charges | Implemented: Housekeeping records evidence, Front Office validates the stay context, and Finance decides the final amount; Housekeeping cannot post a charge |
 | Reservations/bookings | Linked by optional `reservationReference`; no foreign key is imposed because Front Office owns the reservation schema |
 | Reports and audit | Implemented: supervisors can review a read-only consolidated trail and export the filtered records to PDF or Excel |
 
@@ -40,7 +41,7 @@ Housekeeping is merged with newer work from another subsystem.
 - `frontend/src/modules/housekeeping/`
 - `backend/src/modules/housekeeping/`
 - `database/schema/06-housekeeping.sql`
-- `database/seed/06-housekeeping-seed.sql` (development and demo only)
+- `database/seed/06-housekeeping-seed.sql` (non-production development data only)
 - `docs/housekeeping/`
 
 Standalone-only files (do not copy into the class repository):
@@ -102,6 +103,19 @@ HOSIS tables that must exist before `06-housekeeping.sql` is loaded:
 | Front Office (stand-in) | `POST /api/housekeeping/front-office/check-in` `{ roomId }` | AVAILABLE or RESERVED → OCCUPIED |
 | Engineering | `GET /api/housekeeping/maintenance/incoming` | Open maintenance requests reported by Housekeeping |
 | Engineering | `PATCH /api/housekeeping/maintenance/:id/status` `{ status }` | Record `IN_PROGRESS` or `REPAIRED` |
+| Front Office | `GET /api/housekeeping/integrations/front-office/charge-findings` | Read charge findings awaiting Front Office validation |
+| Front Office | `PATCH /api/housekeeping/integrations/front-office/charge-findings/:id` | Reject with a reason or forward a reservation-linked finding to Finance |
+| Finance | `GET /api/housekeeping/integrations/finance/charge-findings` | Read findings validated by Front Office |
+| Finance | `PATCH /api/housekeeping/integrations/finance/charge-findings/:id` | Approve with a final amount or reject; repeated decisions are refused |
+| Human Resources | `GET /api/housekeeping/integrations/hr/leave-requests` | Read Housekeeping leave requests without exposing them to coworkers |
+| Human Resources | `PATCH /api/housekeeping/integrations/hr/leave-requests/:id` | Approve or reject with reviewer identity and decision notes |
+
+Housekeeping personnel use `GET/POST /api/housekeeping/leave-requests` and
+`PATCH /api/housekeeping/leave-requests/:id/withdraw` for their own leave
+records. They use `GET/POST /api/housekeeping/charge-findings` and
+`PATCH /api/housekeeping/charge-findings/:id/withdraw` for operational
+findings. Backend authorization and ownership checks apply even when a caller
+manually invokes an endpoint outside the interface.
 
 ## Public Lost & Found QR lookup
 
@@ -112,9 +126,9 @@ does not require a login and returns only the reference, item description,
 found location/date, and current status. It never returns guest, claimant,
 staff, internal storage, claim-history, or credential data.
 
-The three stand-in endpoints only let the standalone demo finish the room
-cycle. Once the Front Office module handles check-in and room release itself,
-remove them from `frontOffice.routes.js` (or keep them only for demos).
+The three verification endpoints let an isolated installation complete the
+room cycle. In the integrated repository, the Front Office module owns check-in
+and room release and the shared room record remains the source of truth.
 
 Front Office should read `notice_type` on each notice: `ROOM_READY` means the
 room can be released as AVAILABLE; `ROOM_CONDITION` is a staff member's report
@@ -166,15 +180,16 @@ decides otherwise.
    least that large in the shared `express.json()`.
 5. Load the SQL schemas in numerical order. Never load
    `database/standalone/00-shared-tables.sql` there. Load the Housekeeping seed
-   only in a development or demo database: it resets all `hk_` tables.
+   only in a disposable development database: it resets all `hk_` tables.
 6. Keep the `hk_` table prefix and the `/api/housekeeping` route prefix.
 7. Install `jspdf`, `jspdf-autotable`, `write-excel-file` and `qrcode` in the
    combined frontend.
 8. Run `npm run lint` and `npm run build` in `frontend/`, and `npm test` in
    `backend/` against a test database.
-9. Test with Front Office (checkout, room-ready and room-condition notices,
-   booking-linked guest requests, room release) and Engineering (incoming
-   requests and REPAIRED) together.
+9. Test jointly with Front Office (checkout, room-ready and room-condition
+   notices, booking-linked requests, room release, charge validation), Finance
+   (final amount and single invoice linkage), Human Resources (private leave
+   decision), and Engineering (incoming requests and REPAIRED).
 
 ## Environment variables
 

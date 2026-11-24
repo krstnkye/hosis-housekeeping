@@ -23,7 +23,8 @@
 -- psql line up with times the app records. Change it if DB_TIME_ZONE differs.
 SET TIME ZONE 'Asia/Manila';
 
-TRUNCATE hk_inventory_movements, hk_inventory_items, hk_password_must_change,
+TRUNCATE hk_charge_finding_events, hk_charge_findings, hk_leave_requests,
+         hk_inventory_movements, hk_inventory_items, hk_password_must_change,
          hk_password_resets, hk_login_failures, hk_lost_found_photos,
          hk_staff_profile_photos,
          hk_front_office_notifications, hk_maintenance_requests, hk_item_claims,
@@ -39,7 +40,9 @@ INSERT INTO users (first_name, last_name, username, email, password_hash, role, 
     ('Joy',   'Dela Cruz', 'hk.joy',        'joy.delacruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Mark',  'Tan',       'hk.mark',       'mark.tan@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HOUSEKEEPING', 'HOUSEKEEPER'),
     ('Paolo', 'Garcia',    'fo.desk',       'paolo.garcia@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'FRONT_OFFICE', NULL),
-    ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'ENGINEERING', 'TECHNICIAN')
+    ('Rafael', 'Navarro',  'eng.tech',      'rafael.navarro@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'ENGINEERING', 'TECHNICIAN'),
+    ('Helen', 'Reyes',     'hr.officer',    'helen.reyes@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'HR', NULL),
+    ('Felix', 'Cruz',      'finance.officer','felix.cruz@grandhorizon.ph', '$2b$10$GCm/aL4fqp.sJpphNXld3efxysYXO4yepCxwANCyEOC982SMD0nIC', 'FINANCE', NULL)
 ON CONFLICT (username) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash, employment_status = 'ACTIVE';
 
 INSERT INTO rooms (room_number, room_type, floor_number, room_status) VALUES

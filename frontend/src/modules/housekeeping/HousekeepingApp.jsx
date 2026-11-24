@@ -11,6 +11,7 @@ import InspectionPage from './pages/InspectionPage.jsx'
 import SchedulesPage from './pages/SchedulesPage.jsx'
 import RoomReportPage from './pages/RoomReportPage.jsx'
 import PersonalRecordPage from './pages/PersonalRecordPage.jsx'
+import LeaveRequestsPage from './pages/LeaveRequestsPage.jsx'
 import AccountPage, { PasswordForm } from './pages/AccountPage.jsx'
 import StaffAccountsPage from './pages/StaffAccountsPage.jsx'
 import LostFoundPage from './pages/LostFoundPage.jsx'
@@ -33,6 +34,7 @@ const PAGES = {
   'reports-audit': { component: ReportsAuditPage, title: 'Reports & Audit Trail', subtitle: 'Review traceable housekeeping activity and export formal reports.' },
   'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Create approved staff logins and manage temporary passwords.' },
   record: { component: PersonalRecordPage, title: 'Staff Work Reports', subtitle: 'View and download your own or a coworker’s Housekeeping work record.' },
+  leave: { component: LeaveRequestsPage, title: 'Leave Requests', subtitle: 'Send a dated leave request to Human Resources and track its decision.' },
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 
@@ -46,11 +48,11 @@ const STAFF_PAGES = {
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
 const ALL_TABS = [...TABS, ...STAFF_TABS]
-const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'record', 'account']
+const STAFF_MENU = ['overview', 'rooms', 'tasks', 'schedules', 'requests', 'report', 'lost-found', 'maintenance', 'leave', 'record', 'account']
   .map((id) => ALL_TABS.find((t) => t.id === id))
 // Supervisors and inspectors: the full Housekeeping menu plus their own
 // record and account.
-const LEAD_MENU = [...TABS, ...STAFF_TABS.filter((t) => t.id !== 'report')]
+const LEAD_MENU = [...TABS, ...STAFF_TABS]
 
 function leadMenu(user) {
   return LEAD_MENU.filter((t) => !TAB_POSITIONS[t.id] || TAB_POSITIONS[t.id].includes(user.position) || user.role === 'ADMIN')
