@@ -31,6 +31,7 @@ const PAGES = {
   'lost-found': { component: LostFoundPage, title: 'LOST & FOUND', subtitle: 'Record, store and return found belongings with verified claims.' },
   requests: { component: GuestRequestsPage, title: 'Guest Request', subtitle: 'Assign and resolve guest needs without losing track of open work.' },
   maintenance: { component: MaintenancePage, title: 'Maintenance', subtitle: 'Report defects, coordinate with Engineering and protect room readiness.' },
+  report: { component: RoomReportPage, title: 'Report Room Condition', subtitle: 'Tell Front Office and Maintenance about a room’s condition.' },
   'reports-audit': { component: ReportsAuditPage, title: 'Reports & Audit Trail', subtitle: 'Review traceable housekeeping activity and export formal reports.' },
   'staff-accounts': { component: StaffAccountsPage, title: 'Staff Accounts', subtitle: 'Create approved staff logins and manage temporary passwords.' },
   record: { component: PersonalRecordPage, title: 'Staff Work Reports', subtitle: 'View and download your own or a coworker’s Housekeeping work record.' },
@@ -43,7 +44,7 @@ const PAGES = {
 const STAFF_PAGES = {
   overview: { component: StaffDashboardPage, title: 'Staff Dashboard', subtitle: 'Your rooms, guest requests and shift for today.' },
   schedules: { ...PAGES.schedules, title: 'Schedules', subtitle: 'Your shifts and assigned area, and who is on duty with you.' },
-  report: { component: RoomReportPage, title: 'Report Room Condition', subtitle: 'Tell Front Office and Maintenance about a room’s condition.' },
+  report: PAGES.report,
   record: { component: PersonalRecordPage, title: 'Staff Work Reports', subtitle: 'View and download your own or a coworker’s Housekeeping work record.' },
   account: { component: AccountPage, title: 'Account', subtitle: 'Your user ID, email and password.' },
 }
@@ -176,7 +177,10 @@ export default function HousekeepingApp({ session: shellSession = null, onLogout
   const readOnly = session.user.role === 'HOUSEKEEPING_VIEWER'
   const tabs = readOnly ? LEAD_MENU.filter(({ id }) => ['rooms', 'account'].includes(id)) : staff ? STAFF_MENU : leadMenu(session.user)
   const activeTab = tabs.some((t) => t.id === tab) ? tab : readOnly ? 'rooms' : 'overview'
-  const page = (staff && STAFF_PAGES[activeTab]) || PAGES[activeTab]
+  // Keep a malformed or newly added menu entry from taking down the whole
+  // Housekeeping workspace. Every visible route should still be defined in
+  // PAGES/STAFF_PAGES; the dashboard is the safe recovery destination.
+  const page = (staff && STAFF_PAGES[activeTab]) || PAGES[activeTab] || PAGES.overview
   const Page = page.component
 
   function toggleSidebar() {
